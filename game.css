@@ -618,7 +618,11 @@
     .top-bar-main {
         width: 100%;
         justify-content: space-between;
+        gap: 0.75rem;
     }
+
+    .game-header-logo { order: 1; }
+    .back-home-btn    { order: 2; }
 
     .game-header-title {
         font-size: 0.95rem;
