@@ -499,25 +499,31 @@ class WordSearch {
     _timeUp() {
         this._unregisterActiveGame();
         this._saveScore();
-        this._revealAnswers();
 
-        const emojiEl = document.getElementById('end-emoji');
-        if (emojiEl) emojiEl.textContent = '⏰';
-        
-        const titleEl = document.getElementById('end-title');
-        if (titleEl) titleEl.textContent = "Time's Up!";
-        
-        const unfoundCount = this.words.length - this.foundWords.size;
-        const subEl = document.getElementById('end-sub');
-        if (subEl) {
-            subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) are highlighted in orange on the grid!' : ''}`;
-        }
-        
-        const numEl = document.getElementById('score-result-num');
-        if (numEl) numEl.textContent = this.score;
-        
-        document.getElementById('overlay-end')?.classList.remove('hidden');
-        document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
+        // 1. Reveal answers on grid immediately
+        this._revealAnswers();
+        this._toast('⏰ Time Up! Revealing missed answers...', 1500);
+
+        // 2. Delay showing the overlay dialog for 1.2s so player sees the grid reveal first
+        setTimeout(() => {
+            const emojiEl = document.getElementById('end-emoji');
+            if (emojiEl) emojiEl.textContent = '⏰';
+            
+            const titleEl = document.getElementById('end-title');
+            if (titleEl) titleEl.textContent = "Time's Up!";
+            
+            const unfoundCount = this.words.length - this.foundWords.size;
+            const subEl = document.getElementById('end-sub');
+            if (subEl) {
+                subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) are highlighted in orange on the grid!' : ''}`;
+            }
+            
+            const numEl = document.getElementById('score-result-num');
+            if (numEl) numEl.textContent = this.score;
+            
+            document.getElementById('overlay-end')?.classList.remove('hidden');
+            document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
+        }, 1200);
     }
 
     /* Reveal all unfound words on grid & word list when time expires */
