@@ -1,274 +1,333 @@
 /**
  * WORD QUEST — Main JavaScript Controller
  * English Department Carnival
- * Handles floating letter generation, player profile validation,
- * department selection, and localStorage state persistence.
+ * Handles player registration (new + returning), Firebase sync,
+ * floating letter background, and localStorage state.
  */
 
+'use strict';
+
 document.addEventListener('DOMContentLoaded', () => {
-    // ----------------------------------------------------------------------
-    // 1. DOM Elements
-    // ----------------------------------------------------------------------
-    const playerForm = document.getElementById('player-form');
-    const playerNameInput = document.getElementById('player-name');
+
+    // ------------------------------------------------------------------
+    // 1. DOM References
+    // ------------------------------------------------------------------
+    // New registration form
+    const playerForm       = document.getElementById('player-form');
+    const playerNameInput  = document.getElementById('player-name');
+    const rollNumberInput  = document.getElementById('roll-number');
     const departmentSelect = document.getElementById('department');
-    const yearSelect = document.getElementById('year-of-study');
-    const nameError = document.getElementById('name-error');
-    const departmentError = document.getElementById('department-error');
-    const yearError = document.getElementById('year-error');
-    const playerCard = document.getElementById('player-card');
-    const startBtn = document.getElementById('start-btn');
+    const yearSelect       = document.getElementById('year-of-study');
+    const nameError        = document.getElementById('name-error');
+    const rollError        = document.getElementById('roll-error');
+    const departmentError  = document.getElementById('department-error');
+    const yearError        = document.getElementById('year-error');
+    const startBtn         = document.getElementById('start-btn');
+    const playerCard       = document.getElementById('player-card');
     const lettersContainer = document.getElementById('letters-container');
 
-    // LocalStorage Keys
-    const STORAGE_KEY_NAME = 'wordQuest_playerName';
-    const STORAGE_KEY_DEPARTMENT = 'wordQuest_department';
-    const STORAGE_KEY_YEAR = 'wordQuest_yearOfStudy';
+    // Toggle
+    const alreadyRegToggle = document.getElementById('already-reg-toggle');
 
-    // ----------------------------------------------------------------------
-    // 2. Initialize Floating Background Letters (A-Z)
-    // ----------------------------------------------------------------------
+    // Returning player form
+    const returningForm    = document.getElementById('returning-form');
+    const retRollInput     = document.getElementById('ret-roll');
+    const retDeptSelect    = document.getElementById('ret-department');
+    const retYearSelect    = document.getElementById('ret-year');
+    const retRollError     = document.getElementById('ret-roll-error');
+    const retDeptError     = document.getElementById('ret-dept-error');
+    const retYearError     = document.getElementById('ret-year-error');
+    const retLookupError   = document.getElementById('ret-lookup-error');
+    const retStartBtn      = document.getElementById('ret-start-btn');
+    const retBackBtn       = document.getElementById('ret-back-btn');
+
+    // Card header text
+    const formCardTitle    = document.getElementById('form-card-title');
+    const formCardDesc     = document.getElementById('form-card-desc');
+
+    // LocalStorage Keys
+    const KEY_NAME       = 'wordQuest_playerName';
+    const KEY_ROLL       = 'wordQuest_rollNumber';
+    const KEY_DEPARTMENT = 'wordQuest_department';
+    const KEY_YEAR       = 'wordQuest_yearOfStudy';
+
+    // ------------------------------------------------------------------
+    // 2. Floating Background Letters
+    // ------------------------------------------------------------------
     function initFloatingLetters() {
         if (!lettersContainer) return;
-
         const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        const totalLetters = 35; // Total floating particle elements
-
-        for (let i = 0; i < totalLetters; i++) {
-            const letterEl = document.createElement('span');
-            letterEl.classList.add('floating-letter');
-            
-            // Random letter from A-Z
-            const randomChar = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
-            letterEl.textContent = randomChar;
-
-            // Randomized layout & animation properties
-            const posX = Math.random() * 95; // 0% - 95% horizontally
-            const duration = 14 + Math.random() * 18; // 14s - 32s float speed
-            const delay = -Math.random() * 25; // Negative delay so screen is immediately populated
-            const fontSize = 1.2 + Math.random() * 2.2; // 1.2rem - 3.4rem
-            const targetOpacity = (0.04 + Math.random() * 0.12).toFixed(2); // Subtle glow opacity
-
-            // Apply inline styles for dynamic CSS variables
-            letterEl.style.left = `${posX}%`;
-            letterEl.style.animationDuration = `${duration}s`;
-            letterEl.style.animationDelay = `${delay}s`;
-            letterEl.style.fontSize = `${fontSize}rem`;
-            letterEl.style.setProperty('--target-opacity', targetOpacity);
-
-            lettersContainer.appendChild(letterEl);
+        for (let i = 0; i < 35; i++) {
+            const el = document.createElement('span');
+            el.classList.add('floating-letter');
+            el.textContent = alphabet[Math.floor(Math.random() * 26)];
+            el.style.left             = `${Math.random() * 95}%`;
+            el.style.animationDuration = `${14 + Math.random() * 18}s`;
+            el.style.animationDelay   = `${-Math.random() * 25}s`;
+            el.style.fontSize         = `${1.2 + Math.random() * 2.2}rem`;
+            el.style.setProperty('--target-opacity', (0.04 + Math.random() * 0.12).toFixed(2));
+            lettersContainer.appendChild(el);
         }
     }
 
-    // ----------------------------------------------------------------------
-    // 3. LocalStorage Restoration (Pre-populate Player Info)
-    // ----------------------------------------------------------------------
-    function restorePlayerSession() {
-        const savedName = localStorage.getItem(STORAGE_KEY_NAME);
-        const savedDepartment = localStorage.getItem(STORAGE_KEY_DEPARTMENT);
-        const savedYear = localStorage.getItem(STORAGE_KEY_YEAR);
-
-        if (savedName && playerNameInput) {
-            playerNameInput.value = savedName;
-        }
-
-        if (savedDepartment && departmentSelect) {
-            departmentSelect.value = savedDepartment;
-        }
-
-        if (savedYear && yearSelect) {
-            yearSelect.value = savedYear;
-        }
+    // ------------------------------------------------------------------
+    // 3. Restore session (pre-fill from localStorage)
+    // ------------------------------------------------------------------
+    function restoreSession() {
+        const name = localStorage.getItem(KEY_NAME);
+        const roll = localStorage.getItem(KEY_ROLL);
+        const dept = localStorage.getItem(KEY_DEPARTMENT);
+        const year = localStorage.getItem(KEY_YEAR);
+        if (name && playerNameInput)  playerNameInput.value  = name;
+        if (roll && rollNumberInput)  rollNumberInput.value  = roll;
+        if (dept && departmentSelect) departmentSelect.value = dept;
+        if (year && yearSelect)       yearSelect.value       = year;
     }
 
-    // Clear validation error when user interacts with inputs
-    if (playerNameInput) {
-        playerNameInput.addEventListener('input', () => {
-            if (playerNameInput.classList.contains('input-error')) {
-                playerNameInput.classList.remove('input-error');
-                if (nameError) {
-                    nameError.classList.remove('visible');
-                    nameError.textContent = '';
-                }
-            }
+    // ------------------------------------------------------------------
+    // 4. Toggle between New Registration / Already Registered
+    // ------------------------------------------------------------------
+    function showReturningForm() {
+        playerForm.classList.add('hidden');
+        alreadyRegToggle.classList.add('hidden');
+        document.querySelector('.already-reg-divider').classList.add('hidden');
+        returningForm.classList.remove('hidden');
+        if (formCardTitle) formCardTitle.textContent = 'Already Registered?';
+        if (formCardDesc)  formCardDesc.textContent  = 'Enter your roll number to resume your profile';
+    }
+
+    function showNewForm() {
+        returningForm.classList.add('hidden');
+        playerForm.classList.remove('hidden');
+        alreadyRegToggle.classList.remove('hidden');
+        document.querySelector('.already-reg-divider').classList.remove('hidden');
+        if (formCardTitle) formCardTitle.textContent = 'Player Profile';
+        if (formCardDesc)  formCardDesc.textContent  = 'Enter your credentials to enter the competition';
+    }
+
+    if (alreadyRegToggle) alreadyRegToggle.addEventListener('click', showReturningForm);
+    if (retBackBtn)       retBackBtn.addEventListener('click', showNewForm);
+
+    // ------------------------------------------------------------------
+    // 5. Inline validation helpers — clear errors on input
+    // ------------------------------------------------------------------
+    function attachClearError(input, errorEl) {
+        if (!input) return;
+        input.addEventListener('input', () => {
+            input.classList.remove('input-error');
+            if (errorEl) { errorEl.textContent = ''; errorEl.classList.remove('visible'); }
         });
+        if (input.tagName === 'SELECT') {
+            input.addEventListener('change', () => {
+                input.classList.remove('input-error');
+                if (errorEl) { errorEl.textContent = ''; errorEl.classList.remove('visible'); }
+            });
+        }
     }
 
-    if (departmentSelect) {
-        departmentSelect.addEventListener('change', () => {
-            if (departmentSelect.classList.contains('input-error')) {
-                departmentSelect.classList.remove('input-error');
-                if (departmentError) {
-                    departmentError.classList.remove('visible');
-                    departmentError.textContent = '';
-                }
+    attachClearError(playerNameInput, nameError);
+    attachClearError(rollNumberInput, rollError);
+    attachClearError(departmentSelect, departmentError);
+    attachClearError(yearSelect, yearError);
+    attachClearError(retRollInput, retRollError);
+    attachClearError(retDeptSelect, retDeptError);
+    attachClearError(retYearSelect, retYearError);
+
+    function showErr(input, errorEl, msg) {
+        if (input)    input.classList.add('input-error');
+        if (errorEl)  { errorEl.textContent = msg; errorEl.classList.add('visible'); }
+    }
+
+    function triggerShake() {
+        if (!playerCard) return;
+        playerCard.classList.remove('shake');
+        void playerCard.offsetWidth;
+        playerCard.classList.add('shake');
+        setTimeout(() => playerCard.classList.remove('shake'), 500);
+    }
+
+    // ------------------------------------------------------------------
+    // 6. Save to localStorage helper
+    // ------------------------------------------------------------------
+    function saveToStorage(name, roll, dept, year) {
+        try {
+            localStorage.setItem(KEY_NAME,       name);
+            localStorage.setItem(KEY_ROLL,       roll);
+            localStorage.setItem(KEY_DEPARTMENT, dept);
+            localStorage.setItem(KEY_YEAR,       year);
+        } catch (e) { console.warn('localStorage error:', e); }
+    }
+
+    // ------------------------------------------------------------------
+    // 7. Navigate to game
+    // ------------------------------------------------------------------
+    function launchGame(btn) {
+        if (btn) {
+            btn.disabled = true;
+            const t = btn.querySelector('.btn-text');
+            if (t) t.textContent = 'Launching Quest...';
+        }
+        document.body.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
+        document.body.style.opacity    = '0.7';
+        document.body.style.transform  = 'scale(0.99)';
+        setTimeout(() => { window.location.href = 'game.html'; }, 380);
+    }
+
+    // ------------------------------------------------------------------
+    // 8. Wait for Firebase to be ready (module loads async)
+    // ------------------------------------------------------------------
+    function waitForFirebase(cb) {
+        if (window.WordQuestFirebase) { cb(window.WordQuestFirebase); return; }
+        let tries = 0;
+        const poll = setInterval(() => {
+            tries++;
+            if (window.WordQuestFirebase || tries >= 40) {
+                clearInterval(poll);
+                cb(window.WordQuestFirebase || null);
             }
-        });
+        }, 100);
     }
 
-    if (yearSelect) {
-        yearSelect.addEventListener('change', () => {
-            if (yearSelect.classList.contains('input-error')) {
-                yearSelect.classList.remove('input-error');
-                if (yearError) {
-                    yearError.classList.remove('visible');
-                    yearError.textContent = '';
-                }
-            }
-        });
-    }
-
-    // ----------------------------------------------------------------------
-    // 4. Form Validation & Start Game Trigger
-    // ----------------------------------------------------------------------
+    // ------------------------------------------------------------------
+    // 9. NEW REGISTRATION form submit
+    // ------------------------------------------------------------------
     if (playerForm) {
         playerForm.addEventListener('submit', (e) => {
             e.preventDefault();
 
-            const rawName = playerNameInput ? playerNameInput.value : '';
-            const trimmedName = rawName.trim();
-            const selectedDepartment = departmentSelect ? departmentSelect.value : '';
-            const selectedYear = yearSelect ? yearSelect.value : '';
+            const name = (playerNameInput ? playerNameInput.value : '').trim();
+            const roll = (rollNumberInput ? rollNumberInput.value : '').trim().toUpperCase();
+            const dept = departmentSelect ? departmentSelect.value : '';
+            const year = yearSelect       ? yearSelect.value       : '';
 
             let hasError = false;
 
-            // Validate Player Name
-            if (!trimmedName) {
-                showNameError('Please enter your player name to continue.');
+            if (!name || name.length < 2) {
+                showErr(playerNameInput, nameError, name ? 'Name must be at least 2 characters.' : 'Please enter your player name.');
                 hasError = true;
-            } else if (trimmedName.length < 2) {
-                showNameError('Player name must be at least 2 characters.');
+            }
+            if (!roll || roll.length < 2) {
+                showErr(rollNumberInput, rollError, 'Please enter your roll number.');
                 hasError = true;
-            } else {
-                clearNameError();
+            }
+            if (!dept) {
+                showErr(departmentSelect, departmentError, 'Please select your department.');
+                hasError = true;
+            }
+            if (!year) {
+                showErr(yearSelect, yearError, 'Please select your year of study.');
+                hasError = true;
             }
 
-            // Validate Department Selection
-            if (!selectedDepartment) {
-                showDepartmentError('Please select your department.');
-                if (!hasError) triggerShake();
-                hasError = true;
-            } else {
-                clearDepartmentError();
+            if (hasError) { triggerShake(); return; }
+
+            // Save locally right away so game.js can read it even if Firebase is slow
+            saveToStorage(name, roll, dept, year);
+
+            // Disable button, show loading state
+            if (startBtn) {
+                startBtn.disabled = true;
+                const t = startBtn.querySelector('.btn-text');
+                if (t) t.textContent = 'Registering...';
             }
 
-            // Validate Year of Study Selection
-            if (!selectedYear) {
-                showYearError('Please select your year of study.');
-                if (!hasError) triggerShake();
-                hasError = true;
-            } else {
-                clearYearError();
-            }
+            // Register in Firebase (non-blocking — we navigate regardless)
+            waitForFirebase((fb) => {
+                const doRegister = fb && fb.registerPlayer
+                    ? fb.registerPlayer({ name, rollNumber: roll, department: dept, year })
+                    : Promise.resolve(null);
 
-            if (hasError) return;
-
-            // Validation Passed: Clear Errors & Store Data
-            try {
-                localStorage.setItem(STORAGE_KEY_NAME, trimmedName);
-                localStorage.setItem(STORAGE_KEY_DEPARTMENT, selectedDepartment);
-                localStorage.setItem(STORAGE_KEY_YEAR, selectedYear);
-            } catch (err) {
-                console.warn('LocalStorage error:', err);
-            }
-
-            // Animate Button Loading State & Redirect
-            triggerStartGameTransition();
+                doRegister.then(() => {
+                    launchGame(null); // btn already updated above
+                }).catch(() => {
+                    launchGame(null); // still proceed even if Firebase fails
+                });
+            });
         });
     }
 
-    // Helper: Display visual validation error for Name
-    function showNameError(message) {
-        if (!playerNameInput) return;
-        playerNameInput.classList.add('input-error');
-        if (nameError) {
-            nameError.textContent = message;
-            nameError.classList.add('visible');
-        }
-        triggerShake();
-        playerNameInput.focus();
+    // ------------------------------------------------------------------
+    // 10. ALREADY REGISTERED form submit — lookup by roll + dept + year
+    // ------------------------------------------------------------------
+    if (returningForm) {
+        returningForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const roll = (retRollInput   ? retRollInput.value   : '').trim().toUpperCase();
+            const dept = retDeptSelect   ? retDeptSelect.value  : '';
+            const year = retYearSelect   ? retYearSelect.value  : '';
+
+            let hasError = false;
+
+            if (!roll || roll.length < 2) {
+                showErr(retRollInput, retRollError, 'Please enter your roll number.');
+                hasError = true;
+            }
+            if (!dept) {
+                showErr(retDeptSelect, retDeptError, 'Please select your department.');
+                hasError = true;
+            }
+            if (!year) {
+                showErr(retYearSelect, retYearError, 'Please select your year of study.');
+                hasError = true;
+            }
+
+            if (hasError) { triggerShake(); return; }
+
+            // Show searching state
+            if (retStartBtn) {
+                retStartBtn.disabled = true;
+                const t = retStartBtn.querySelector('.btn-text');
+                if (t) t.textContent = 'Searching...';
+            }
+            if (retLookupError) { retLookupError.textContent = ''; retLookupError.classList.remove('visible'); }
+
+            waitForFirebase(async (fb) => {
+                if (!fb || !fb.getPlayerByRollNumber) {
+                    // Firebase unavailable — proceed with whatever is in localStorage
+                    saveToStorage(
+                        localStorage.getItem(KEY_NAME) || 'Player',
+                        roll, dept, year
+                    );
+                    launchGame(retStartBtn);
+                    return;
+                }
+
+                try {
+                    const player = await fb.getPlayerByRollNumber(roll, dept, year);
+
+                    if (!player) {
+                        // Not found
+                        if (retLookupError) {
+                            retLookupError.textContent = '❌ No registration found. Please use New Registration.';
+                            retLookupError.classList.add('visible');
+                        }
+                        if (retStartBtn) {
+                            retStartBtn.disabled = false;
+                            const t = retStartBtn.querySelector('.btn-text');
+                            if (t) t.textContent = 'Find & Begin Quest';
+                        }
+                        triggerShake();
+                        return;
+                    }
+
+                    // Found — restore profile and go
+                    saveToStorage(player.name || 'Player', roll, dept, year);
+                    launchGame(retStartBtn);
+
+                } catch (err) {
+                    console.warn('Lookup error:', err);
+                    // Network error fallback — still let them in
+                    saveToStorage(localStorage.getItem(KEY_NAME) || 'Player', roll, dept, year);
+                    launchGame(retStartBtn);
+                }
+            });
+        });
     }
 
-    function clearNameError() {
-        if (playerNameInput) playerNameInput.classList.remove('input-error');
-        if (nameError) {
-            nameError.classList.remove('visible');
-            nameError.textContent = '';
-        }
-    }
-
-    // Helper: Display visual validation error for Department
-    function showDepartmentError(message) {
-        if (!departmentSelect) return;
-        departmentSelect.classList.add('input-error');
-        if (departmentError) {
-            departmentError.textContent = message;
-            departmentError.classList.add('visible');
-        }
-        departmentSelect.focus();
-    }
-
-    function clearDepartmentError() {
-        if (departmentSelect) departmentSelect.classList.remove('input-error');
-        if (departmentError) {
-            departmentError.classList.remove('visible');
-            departmentError.textContent = '';
-        }
-    }
-
-    // Helper: Display visual validation error for Year of Study
-    function showYearError(message) {
-        if (!yearSelect) return;
-        yearSelect.classList.add('input-error');
-        if (yearError) {
-            yearError.textContent = message;
-            yearError.classList.add('visible');
-        }
-        yearSelect.focus();
-    }
-
-    function clearYearError() {
-        if (yearSelect) yearSelect.classList.remove('input-error');
-        if (yearError) {
-            yearError.classList.remove('visible');
-            yearError.textContent = '';
-        }
-    }
-
-    function triggerShake() {
-        if (playerCard) {
-            playerCard.classList.remove('shake');
-            void playerCard.offsetWidth; // Force reflow
-            playerCard.classList.add('shake');
-            setTimeout(() => {
-                playerCard.classList.remove('shake');
-            }, 500);
-        }
-    }
-
-    // Helper: Button transition & navigation to game.html
-    function triggerStartGameTransition() {
-        if (!startBtn) return;
-
-        startBtn.disabled = true;
-        const btnText = startBtn.querySelector('.btn-text');
-        if (btnText) {
-            btnText.textContent = 'Launching Quest...';
-        }
-
-        // Add sleek fade-out scaling to body before redirecting
-        document.body.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
-        document.body.style.opacity = '0.7';
-        document.body.style.transform = 'scale(0.99)';
-
-        setTimeout(() => {
-            window.location.href = 'game.html';
-        }, 350);
-    }
-
-    // ----------------------------------------------------------------------
-    // 6. Execution Entry Point
-    // ----------------------------------------------------------------------
+    // ------------------------------------------------------------------
+    // 11. Boot
+    // ------------------------------------------------------------------
     initFloatingLetters();
-    restorePlayerSession();
+    restoreSession();
 });

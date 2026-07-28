@@ -8,11 +8,12 @@ import {
     getFirestore, 
     collection, 
     addDoc, 
-    getDocs, 
+    getDocs,
     doc, 
     deleteDoc, 
     query, 
     orderBy, 
+    where,
     limit, 
     onSnapshot,
     setDoc,
@@ -123,6 +124,106 @@ export async function getWordBankFromFirestore() {
     return null;
 }
 
+/**
+ * Register a new player in the Firestore 'players' collection.
+ * Returns the document ID of the newly created record.
+ * @param {{ name, department, year, rollNumber }} playerData
+ */
+export async function registerPlayer(playerData) {
+    try {
+        const docRef = await addDoc(collection(db, "players"), {
+            name:        playerData.name       || "Player",
+            department:  playerData.department || "",
+            year:        playerData.year       || "",
+            rollNumber:  playerData.rollNumber || "",
+            registeredAt: serverTimestamp()
+        });
+        console.log("Player registered with ID:", docRef.id);
+        return docRef.id;
+    } catch (e) {
+        console.warn("Firestore registerPlayer error:", e);
+        return null;
+    }
+}
+
+/**
+ * Look up an already-registered player by roll number + department + year.
+ * Returns the player data object, or null if not found.
+ * @param {string} rollNumber
+ * @param {string} department
+ * @param {string} year
+ */
+export async function getPlayerByRollNumber(rollNumber, department, year) {
+    try {
+        const q = query(
+            collection(db, "players"),
+            where("rollNumber",  "==", rollNumber),
+            where("department",  "==", department),
+            where("year",        "==", year),
+            limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            const d = snap.docs[0];
+            return { id: d.id, ...d.data() };
+        }
+        return null;
+    } catch (e) {
+        console.warn("Firestore getPlayerByRollNumber error:", e);
+        return null;
+    }
+}
+
+/**
+ * Register a live game session in Firestore
+ * @returns {String} The session document ID
+ */
+let _activeGameDocId = null;
+export async function registerActiveGame() {
+    try {
+        const docRef = await addDoc(collection(db, "active_games"), {
+            startedAt: serverTimestamp()
+        });
+        _activeGameDocId = docRef.id;
+        console.log("Active game registered:", docRef.id);
+        return docRef.id;
+    } catch (e) {
+        console.warn("Failed to register active game:", e);
+        return null;
+    }
+}
+
+/**
+ * Remove the active game session from Firestore (on finish or unload)
+ */
+export async function unregisterActiveGame() {
+    const id = _activeGameDocId;
+    if (!id) return;
+    try {
+        await deleteDoc(doc(db, "active_games", id));
+        _activeGameDocId = null;
+        console.log("Active game unregistered:", id);
+    } catch (e) {
+        console.warn("Failed to unregister active game:", e);
+    }
+}
+
+/**
+ * Subscribe to the count of currently active game sessions
+ * @param {Function} callback Called with the live game count (number)
+ */
+export function subscribeToActiveGameCount(callback) {
+    try {
+        return onSnapshot(collection(db, "active_games"), (snapshot) => {
+            callback(snapshot.size);
+        }, (error) => {
+            console.warn("Active games snapshot error:", error);
+        });
+    } catch (e) {
+        console.warn("subscribeToActiveGameCount error:", e);
+    }
+}
+
 // Make available globally for non-module scripts if needed
 window.WordQuestFirebase = {
     app,
@@ -131,5 +232,10 @@ window.WordQuestFirebase = {
     subscribeToLeaderboard,
     deleteScoreFromFirestore,
     saveWordBankToFirestore,
-    getWordBankFromFirestore
+    getWordBankFromFirestore,
+    registerPlayer,
+    getPlayerByRollNumber,
+    registerActiveGame,
+    unregisterActiveGame,
+    subscribeToActiveGameCount
 };

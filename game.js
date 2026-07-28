@@ -5,7 +5,7 @@
  *  - Generates a random 12×12 letter grid
  *  - Places 8 hidden words (horizontal, vertical, diagonal — all directions)
  *  - Click-and-drag selection on desktop & touch
- *  - Countdown timer (2 minutes default)
+ *  - Countdown timer (5 minutes default)
  *  - Score: +10 per word found, +remaining seconds when complete
  *  - Game-over overlay on time-up or all words found
  */
@@ -23,7 +23,7 @@ const WORD_BANK = [
 
 const GRID_SIZE  = 12;   // 12×12 grid
 const WORD_COUNT = 8;    // words to hide
-const GAME_SECS  = 120;  // 2 minutes
+const GAME_SECS  = 300;  // 5 minutes
 const PTS_WORD   = 10;   // points per word found
 
 /* ─── DIRECTIONS (dx, dy) ───────────────────── */
@@ -69,9 +69,14 @@ class WordSearch {
         this._renderWordList();
         this._bindEvents();
         this._startTimer();
+        this._registerActiveGame();
+
+        // Load custom word bank from Firestore (for next game or restart)
+        this._loadWordBankFromFirebase();
     }
 
     restart() {
+        this._unregisterActiveGame();
         this._stopTimer();
         document.getElementById('overlay-end')?.classList.add('hidden');
 
@@ -94,6 +99,33 @@ class WordSearch {
         this._bindEvents();
         this._startTimer();
         this._updateHUD();
+        this._registerActiveGame();
+    }
+
+    /* ── FIREBASE ACTIVE GAME TRACKING ─────────── */
+    _registerActiveGame() {
+        if (window.WordQuestFirebase && window.WordQuestFirebase.registerActiveGame) {
+            window.WordQuestFirebase.registerActiveGame();
+        }
+    }
+
+    _unregisterActiveGame() {
+        if (window.WordQuestFirebase && window.WordQuestFirebase.unregisterActiveGame) {
+            window.WordQuestFirebase.unregisterActiveGame();
+        }
+    }
+
+    /* ── WORD BANK FROM FIREBASE ───────────────── */
+    _loadWordBankFromFirebase() {
+        if (window.WordQuestFirebase && window.WordQuestFirebase.getWordBankFromFirestore) {
+            window.WordQuestFirebase.getWordBankFromFirestore().then((remoteWords) => {
+                if (Array.isArray(remoteWords) && remoteWords.length >= WORD_COUNT) {
+                    try {
+                        localStorage.setItem('wordQuest_customWords', JSON.stringify(remoteWords));
+                    } catch (e) { /* noop */ }
+                }
+            }).catch(() => { /* fallback to localStorage already done */ });
+        }
     }
 
     _pickWords() {
@@ -405,6 +437,7 @@ class WordSearch {
     /* ── END STATES ───────────────────────────── */
     _win() {
         this._stopTimer();
+        this._unregisterActiveGame();
         const bonus = this._remaining;
         this.score += bonus;
         this._updateHUD();
@@ -426,6 +459,7 @@ class WordSearch {
     }
 
     _timeUp() {
+        this._unregisterActiveGame();
         this._saveScore();
 
         const emojiEl = document.getElementById('end-emoji');
@@ -445,13 +479,34 @@ class WordSearch {
 
     /* ── SCORE PERSISTENCE ────────────────────── */
     _saveScore() {
+        // Read player profile from localStorage (set by script.js on index.html)
+        const name       = localStorage.getItem('wordQuest_playerName')       || 'Player';
+        const department = localStorage.getItem('wordQuest_department')        || '';
+        const year       = localStorage.getItem('wordQuest_yearOfStudy')       || '';
+
+        const record = {
+            name,
+            department,
+            year,
+            score: this.score,
+            date:  new Date().toLocaleDateString()
+        };
+
+        // 1. Save to localStorage leaderboard
         try {
-            const key = 'wq_scores';
+            const key  = 'wordQuest_leaderboard';
             const list = JSON.parse(localStorage.getItem(key) || '[]');
-            list.push({ score: this.score, date: new Date().toLocaleDateString() });
+            list.push(record);
             list.sort((a, b) => b.score - a.score);
-            localStorage.setItem(key, JSON.stringify(list.slice(0, 10)));
+            localStorage.setItem(key, JSON.stringify(list.slice(0, 100)));
         } catch { /* noop */ }
+
+        // 2. Save to Firestore (if Firebase module has loaded)
+        if (window.WordQuestFirebase && window.WordQuestFirebase.saveScoreToFirestore) {
+            window.WordQuestFirebase.saveScoreToFirestore(record).catch(() => {
+                console.warn('Firestore score save failed — score is in localStorage.');
+            });
+        }
     }
 
     /* ── HELPERS ──────────────────────────────── */
@@ -488,4 +543,34 @@ class WordSearch {
 
 /* ─── BOOT ───────────────────────────────────── */
 const WS = new WordSearch();
-document.addEventListener('DOMContentLoaded', () => WS.init());
+
+/**
+ * Wait for firebase-service.js module to expose window.WordQuestFirebase,
+ * then boot the game. Falls back to immediate boot if Firebase doesn't load
+ * within 3 seconds (offline / blocked).
+ */
+function bootGame() {
+    if (window.WordQuestFirebase) {
+        WS.init();
+    } else {
+        // Firebase module not yet ready — poll briefly then give up
+        let attempts = 0;
+        const poll = setInterval(() => {
+            attempts++;
+            if (window.WordQuestFirebase || attempts >= 30) {
+                clearInterval(poll);
+                WS.init();
+            }
+        }, 100);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootGame);
+} else {
+    bootGame();
+}
+
+// Clean up active game session if user navigates away mid-game
+window.addEventListener('pagehide', () => WS._unregisterActiveGame());
+window.addEventListener('beforeunload', () => WS._unregisterActiveGame());

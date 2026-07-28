@@ -1527,3 +1527,84 @@ body {
         margin-top: 0.25rem;
     }
 }
+
+/* ==========================================================================
+   ALREADY REGISTERED & RETURNING PLAYER STYLES
+   ========================================================================== */
+
+/* Utility: hide elements */
+.hidden {
+    display: none !important;
+}
+
+/* Divider "or" line */
+.already-reg-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1.1rem 0 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+}
+.already-reg-divider::before,
+.already-reg-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* "Already Registered?" ghost link-style button */
+.already-reg-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.65rem 1rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    letter-spacing: 0.02em;
+    text-align: center;
+    font-family: var(--font-main);
+}
+.already-reg-btn:hover {
+    color: var(--accent-gold-light);
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.06);
+}
+
+/* "← New Registration" back link */
+.ret-back-link {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-family: var(--font-main);
+    cursor: pointer;
+    padding: 0.25rem 0;
+    transition: color var(--transition-fast);
+    text-align: center;
+    width: 100%;
+    margin-top: 0.25rem;
+}
+.ret-back-link:hover {
+    color: var(--text-secondary);
+}
+
+/* Global lookup error (e.g. "not found") */
+.ret-global-error {
+    text-align: center;
+    font-size: 0.875rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--radius-sm);
+    background: var(--error-bg);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.ret-global-error.visible {
+    display: block;
+}
+

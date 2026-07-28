@@ -363,6 +363,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             }
+
+            // Live games counter
+            if (window.WordQuestFirebase.subscribeToActiveGameCount) {
+                window.WordQuestFirebase.subscribeToActiveGameCount((count) => {
+                    const liveEl = document.getElementById('stat-live-games');
+                    if (liveEl) liveEl.textContent = count;
+                });
+            }
         }
     }
 

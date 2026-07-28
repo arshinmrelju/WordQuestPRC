@@ -44,10 +44,6 @@
                         <span class="badge-icon">🏛️</span>
                         <span class="badge-text">English Dept Carnival 2026</span>
                     </div>
-                    <a href="admin.html" class="header-admin-link" title="Admin Control Panel">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        <span>Admin</span>
-                    </a>
                 </div>
             </div>
         </header>
@@ -71,21 +67,33 @@
                         </svg>
                     </div>
                     <div>
-                        <h2 class="card-title">Player Profile</h2>
-                        <p class="card-desc">Enter your credentials to enter the competition</p>
+                        <h2 class="card-title" id="form-card-title">Player Profile</h2>
+                        <p class="card-desc" id="form-card-desc">Enter your credentials to enter the competition</p>
                     </div>
                 </div>
 
+                <!-- ── NEW REGISTRATION FORM ── -->
                 <form id="player-form" class="player-form" novalidate>
                     <!-- Player Name Field -->
-                    <div class="form-group">
+                    <div class="form-group" id="field-name">
                         <label for="player-name" class="form-label">Player Name</label>
                         <div class="input-wrapper">
                             <input type="text" id="player-name" class="glass-input" placeholder="Enter your name..."
-                                maxlength="20" autocomplete="off" required>
+                                maxlength="30" autocomplete="off" required>
                             <span class="input-focus-border"></span>
                         </div>
                         <div id="name-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
+                    <!-- Roll Number Field -->
+                    <div class="form-group" id="field-roll">
+                        <label for="roll-number" class="form-label">Roll Number</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="roll-number" class="glass-input" placeholder="e.g. 23ENG001"
+                                maxlength="20" autocomplete="off" required>
+                            <span class="input-focus-border"></span>
+                        </div>
+                        <div id="roll-error" class="error-message" aria-live="polite"></div>
                     </div>
 
                     <!-- Department Selection Field -->
@@ -152,7 +160,97 @@
                         </span>
                     </button>
                 </form>
+
+                <!-- ── ALREADY REGISTERED TOGGLE ── -->
+                <div class="already-reg-divider">
+                    <span>or</span>
+                </div>
+                <button type="button" id="already-reg-toggle" class="already-reg-btn">
+                    Already Registered? Log in here
+                </button>
+
+                <!-- ── ALREADY REGISTERED FORM (hidden by default) ── -->
+                <form id="returning-form" class="player-form returning-form hidden" novalidate>
+                    <!-- Roll Number Lookup -->
+                    <div class="form-group">
+                        <label for="ret-roll" class="form-label">Roll Number</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="ret-roll" class="glass-input" placeholder="e.g. 23ENG001"
+                                maxlength="20" autocomplete="off" required>
+                            <span class="input-focus-border"></span>
+                        </div>
+                        <div id="ret-roll-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
+                    <!-- Department (for lookup) -->
+                    <div class="form-group">
+                        <label for="ret-department" class="form-label">Department</label>
+                        <div class="select-wrapper">
+                            <select id="ret-department" class="glass-input glass-select" required>
+                                <option value="" disabled selected>Select your department...</option>
+                                <option value="Department of Biochemistry">Department of Biochemistry</option>
+                                <option value="Department of Commerce">Department of Commerce</option>
+                                <option value="Department of Economics">Department of Economics</option>
+                                <option value="Department of English">Department of English</option>
+                                <option value="Department of History">Department of History</option>
+                                <option value="Department of Journalism and Mass Communication">Department of Journalism
+                                    and Mass Communication</option>
+                                <option value="Department of Microbiology">Department of Microbiology</option>
+                                <option value="Department of Travel and Tourism">Department of Travel and Tourism</option>
+                            </select>
+                            <div class="select-arrow">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div id="ret-dept-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
+                    <!-- Year (for lookup) -->
+                    <div class="form-group">
+                        <label for="ret-year" class="form-label">Year of Study</label>
+                        <div class="select-wrapper">
+                            <select id="ret-year" class="glass-input glass-select" required>
+                                <option value="" disabled selected>Select your year...</option>
+                                <option value="1st Year">1st Year</option>
+                                <option value="2nd Year">2nd Year</option>
+                                <option value="3rd Year">3rd Year</option>
+                                <option value="1st Year PG">1st Year (PG)</option>
+                                <option value="2nd Year PG">2nd Year (PG)</option>
+                            </select>
+                            <div class="select-arrow">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div id="ret-year-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
+                    <div id="ret-lookup-error" class="error-message ret-global-error" aria-live="polite"></div>
+
+                    <button type="submit" id="ret-start-btn" class="glass-btn btn-primary">
+                        <span class="btn-text">Find & Begin Quest</span>
+                        <span class="btn-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                        </span>
+                    </button>
+
+                    <button type="button" id="ret-back-btn" class="ret-back-link">
+                        ← New Registration
+                    </button>
+                </form>
             </section>
+
 
             <!-- Word Quest Gameplay Guide Card -->
             <section class="glass-card card-entrance rules-card" id="rules-card">
@@ -207,7 +305,7 @@
                             <circle cx="12" cy="12" r="10" />
                             <polyline points="12 6 12 12 16 14" />
                         </svg>
-                        <span>2-Min Timer</span>
+                        <span>5-Min Timer</span>
                     </div>
                     <div class="rule-chip">
                         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
