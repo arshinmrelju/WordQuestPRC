@@ -79,6 +79,7 @@ class WordSearch {
         this._unregisterActiveGame();
         this._stopTimer();
         document.getElementById('overlay-end')?.classList.add('hidden');
+        document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
 
         // reset state
         this.grid       = [];
@@ -456,11 +457,13 @@ class WordSearch {
         if (numEl) numEl.textContent = this.score;
         
         document.getElementById('overlay-end')?.classList.remove('hidden');
+        document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
     }
 
     _timeUp() {
         this._unregisterActiveGame();
         this._saveScore();
+        this._revealAnswers();
 
         const emojiEl = document.getElementById('end-emoji');
         if (emojiEl) emojiEl.textContent = '⏰';
@@ -468,13 +471,54 @@ class WordSearch {
         const titleEl = document.getElementById('end-title');
         if (titleEl) titleEl.textContent = "Time's Up!";
         
+        const unfoundCount = this.words.length - this.foundWords.size;
         const subEl = document.getElementById('end-sub');
-        if (subEl) subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words.`;
+        if (subEl) {
+            subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) are highlighted in orange on the grid!' : ''}`;
+        }
         
         const numEl = document.getElementById('score-result-num');
         if (numEl) numEl.textContent = this.score;
         
         document.getElementById('overlay-end')?.classList.remove('hidden');
+        document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
+    }
+
+    /* Reveal all unfound words on grid & word list when time expires */
+    _revealAnswers() {
+        for (const word of this.words) {
+            if (!this.foundWords.has(word)) {
+                // Highlight cells on the grid
+                const cells = this.placed[word] || [];
+                cells.forEach(({ r, c }) => {
+                    const el = this._cellEl(r, c);
+                    if (el && !el.classList.contains('found')) {
+                        el.classList.add('revealed');
+                    }
+                });
+
+                // Highlight word in the sidebar list
+                const li = document.getElementById(`word-${word}`);
+                if (li) {
+                    li.classList.add('revealed-word');
+                    li.setAttribute('title', 'Missed word — revealed on grid');
+                }
+            }
+        }
+    }
+
+    /* Toggle game over overlay modal to inspect grid */
+    toggleOverlay() {
+        const overlay = document.getElementById('overlay-end');
+        const reopenBtn = document.getElementById('reopen-overlay-btn');
+        if (overlay) {
+            overlay.classList.toggle('hidden');
+            const isHidden = overlay.classList.contains('hidden');
+            if (reopenBtn) {
+                if (isHidden) reopenBtn.classList.remove('hidden');
+                else reopenBtn.classList.add('hidden');
+            }
+        }
     }
 
     /* ── SCORE PERSISTENCE ────────────────────── */
