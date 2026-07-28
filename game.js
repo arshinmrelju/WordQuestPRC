@@ -139,8 +139,7 @@ class WordSearch {
         } catch (e) {
             pool = WORD_BANK;
         }
-        const shuffled = [...pool].sort(() => Math.random() - 0.5);
-        this.words = shuffled.slice(0, WORD_COUNT);
+        this.candidatePool = [...pool];
     }
 
     /* ── GRID GENERATION ──────────────────────── */
@@ -151,49 +150,86 @@ class WordSearch {
 
     _placeWords() {
         this.placed = {};
-        for (const word of this.words) {
-            this._placeOne(word);
+        const placedWords = [];
+        const pool = [...this.candidatePool].sort(() => Math.random() - 0.5);
+
+        for (const word of pool) {
+            if (placedWords.length >= WORD_COUNT) break;
+            if (this._placeOne(word)) {
+                placedWords.push(word);
+            }
         }
+
+        // If pool was exhausted before reaching WORD_COUNT, retry with default WORD_BANK fallback
+        if (placedWords.length < WORD_COUNT) {
+            const fallbackPool = [...WORD_BANK].sort(() => Math.random() - 0.5);
+            for (const word of fallbackPool) {
+                if (placedWords.length >= WORD_COUNT) break;
+                if (!placedWords.includes(word) && this._placeOne(word)) {
+                    placedWords.push(word);
+                }
+            }
+        }
+
+        this.words = placedWords;
     }
 
     _placeOne(word) {
         const len = word.length;
-        let placed = false;
-        let attempts = 0;
+        if (len > this.gridSize) return false;
 
-        while (!placed && attempts < 200) {
+        let attempts = 0;
+        const directions = [...DIRS].sort(() => Math.random() - 0.5);
+
+        while (attempts < 500) {
             attempts++;
 
-            const [dx, dy] = DIRS[Math.floor(Math.random() * DIRS.length)];
-            const maxR = dy === 0  ? this.gridSize
-                       : dy > 0   ? this.gridSize - len
-                       : len - 1;
-            const maxC = dx === 0  ? this.gridSize
-                       : dx > 0   ? this.gridSize - len
-                       : len - 1;
-            const minR = dy < 0 ? len - 1 : 0;
-            const minC = dx < 0 ? len - 1 : 0;
+            const [dx, dy] = directions[Math.floor(Math.random() * directions.length)];
 
-            const r = Math.floor(Math.random() * (maxR - minR)) + minR;
-            const c = Math.floor(Math.random() * (maxC - minC)) + minC;
+            // Starting row bounds for direction dy
+            let minR = 0;
+            let maxR = this.gridSize - 1;
+            if (dy > 0) {
+                maxR = this.gridSize - len;
+            } else if (dy < 0) {
+                minR = len - 1;
+            }
 
-            // Check if all cells are free or already match
+            // Starting column bounds for direction dx
+            let minC = 0;
+            let maxC = this.gridSize - 1;
+            if (dx > 0) {
+                maxC = this.gridSize - len;
+            } else if (dx < 0) {
+                minC = len - 1;
+            }
+
+            const r = Math.floor(Math.random() * (maxR - minR + 1)) + minR;
+            const c = Math.floor(Math.random() * (maxC - minC + 1)) + minC;
+
             let ok = true;
             const cells = [];
             for (let i = 0; i < len; i++) {
                 const nr = r + dy * i;
                 const nc = c + dx * i;
-                if (nr < 0 || nr >= this.gridSize || nc < 0 || nc >= this.gridSize) { ok = false; break; }
-                if (this.grid[nr][nc] !== '' && this.grid[nr][nc] !== word[i]) { ok = false; break; }
+                if (nr < 0 || nr >= this.gridSize || nc < 0 || nc >= this.gridSize) {
+                    ok = false;
+                    break;
+                }
+                if (this.grid[nr][nc] !== '' && this.grid[nr][nc] !== word[i]) {
+                    ok = false;
+                    break;
+                }
                 cells.push({ r: nr, c: nc });
             }
 
             if (ok) {
                 cells.forEach(({ r, c }, i) => { this.grid[r][c] = word[i]; });
                 this.placed[word] = cells;
-                placed = true;
+                return true;
             }
         }
+        return false;
     }
 
     _fillGarbage() {
