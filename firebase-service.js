@@ -43,6 +43,7 @@ export async function saveScoreToFirestore(scoreData) {
     try {
         const docRef = await addDoc(collection(db, "leaderboard"), {
             name: scoreData.name || "Player",
+            rollNumber: scoreData.rollNumber || "",
             department: scoreData.department || "",
             year: scoreData.year || "",
             difficulty: scoreData.difficulty || "medium",

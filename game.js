@@ -481,11 +481,13 @@ class WordSearch {
     _saveScore() {
         // Read player profile from localStorage (set by script.js on index.html)
         const name       = localStorage.getItem('wordQuest_playerName')       || 'Player';
+        const rollNumber = localStorage.getItem('wordQuest_rollNumber')       || '';
         const department = localStorage.getItem('wordQuest_department')        || '';
         const year       = localStorage.getItem('wordQuest_yearOfStudy')       || '';
 
         const record = {
             name,
+            rollNumber,
             department,
             year,
             score: this.score,
