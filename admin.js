@@ -1,6 +1,6 @@
 /**
  * WORD QUEST — Admin Control Panel Logic (admin.js)
- * Manages player records, leaderboard filtering, CSV exports, stats calculations,
+ * Manages player registrations, leaderboard scores, CSV exports, stats calculations,
  * and custom word bank management.
  */
 
@@ -19,55 +19,94 @@ document.addEventListener('DOMContentLoaded', () => {
     const STORAGE_KEY_LEADERBOARD = 'wordQuest_leaderboard';
     const STORAGE_KEY_CUSTOM_WORDS = 'wordQuest_customWords';
 
-    // DOM Elements
+    // DOM Elements - Dashboard Stats
     const statTotalPlayers = document.getElementById('stat-total-players');
-    const statTopScore = document.getElementById('stat-top-score');
-    const statTopDept = document.getElementById('stat-top-dept');
-    const statAvgScore = document.getElementById('stat-avg-score');
+    const statTopScore     = document.getElementById('stat-top-score');
+    const statTopDept      = document.getElementById('stat-top-dept');
+    const statAvgScore     = document.getElementById('stat-avg-score');
 
+    // DOM Elements - Tabs
+    const tabBtnPlayers     = document.getElementById('tab-btn-players');
+    const tabBtnLeaderboard = document.getElementById('tab-btn-leaderboard');
+    const viewPlayersTable  = document.getElementById('view-players-table');
+    const viewLeaderboardTable = document.getElementById('view-leaderboard-table');
+    const badgePlayersCount = document.getElementById('badge-players-count');
+    const badgeLeaderboardCount = document.getElementById('badge-leaderboard-count');
+
+    // DOM Elements - Filters & Tables
     const searchInput = document.getElementById('admin-search-input');
-    const deptFilter = document.getElementById('admin-dept-filter');
-    const yearFilter = document.getElementById('admin-year-filter');
-    const tableBody = document.getElementById('admin-table-body');
+    const deptFilter  = document.getElementById('admin-dept-filter');
+    const yearFilter  = document.getElementById('admin-year-filter');
+    const playersTableBody = document.getElementById('admin-players-table-body');
+    const leaderboardTableBody = document.getElementById('admin-leaderboard-table-body');
 
-    const exportBtn = document.getElementById('export-csv-btn');
-    const clearBtn = document.getElementById('clear-data-btn');
-
-    const addWordForm = document.getElementById('add-word-form');
+    // DOM Elements - Action Buttons
+    const exportBtn    = document.getElementById('export-csv-btn');
+    const clearBtn     = document.getElementById('clear-data-btn');
+    const addWordForm  = document.getElementById('add-word-form');
     const newWordInput = document.getElementById('new-word-input');
     const wordsTagContainer = document.getElementById('words-tag-container');
 
     // Data State
-    let recordsList = [];
+    let playersList     = []; // Registered players from Firestore 'players'
+    let leaderboardList = []; // Game scores from Firestore 'leaderboard'
     let customWordsList = [];
+    let currentTab      = 'players'; // 'players' | 'leaderboard'
 
     // ----------------------------------------------------------------------
-    // 1. Load Data from LocalStorage
+    // 1. Tab Switching
+    // ----------------------------------------------------------------------
+    function switchTab(tab) {
+        currentTab = tab;
+        if (tab === 'players') {
+            if (tabBtnPlayers) tabBtnPlayers.classList.add('active');
+            if (tabBtnLeaderboard) tabBtnLeaderboard.classList.remove('active');
+            if (viewPlayersTable) viewPlayersTable.classList.remove('hidden');
+            if (viewLeaderboardTable) viewLeaderboardTable.classList.add('hidden');
+            renderPlayersTable();
+        } else {
+            if (tabBtnLeaderboard) tabBtnLeaderboard.classList.add('active');
+            if (tabBtnPlayers) tabBtnPlayers.classList.remove('active');
+            if (viewLeaderboardTable) viewLeaderboardTable.classList.remove('hidden');
+            if (viewPlayersTable) viewPlayersTable.classList.add('hidden');
+            renderLeaderboardTable();
+        }
+    }
+
+    if (tabBtnPlayers)     tabBtnPlayers.addEventListener('click', () => switchTab('players'));
+    if (tabBtnLeaderboard) tabBtnLeaderboard.addEventListener('click', () => switchTab('leaderboard'));
+
+    // ----------------------------------------------------------------------
+    // 2. Load Local Data Backup
     // ----------------------------------------------------------------------
     function loadData() {
         try {
-            recordsList = JSON.parse(localStorage.getItem(STORAGE_KEY_LEADERBOARD) || '[]');
+            leaderboardList = JSON.parse(localStorage.getItem(STORAGE_KEY_LEADERBOARD) || '[]');
         } catch (e) {
-            console.warn('Error loading leaderboard records:', e);
-            recordsList = [];
+            leaderboardList = [];
         }
 
         try {
             customWordsList = JSON.parse(localStorage.getItem(STORAGE_KEY_CUSTOM_WORDS) || JSON.stringify(DEFAULT_WORD_BANK));
         } catch (e) {
-            console.warn('Error loading custom words:', e);
             customWordsList = [...DEFAULT_WORD_BANK];
         }
     }
 
     // ----------------------------------------------------------------------
-    // 2. Compute Dashboard Statistics
+    // 3. Compute Dashboard Statistics
     // ----------------------------------------------------------------------
     function updateStats() {
-        const total = recordsList.length;
-        if (statTotalPlayers) statTotalPlayers.textContent = total;
+        // Total Registered Participants Count
+        const totalReg = playersList.length;
+        if (statTotalPlayers) statTotalPlayers.textContent = totalReg;
+        if (badgePlayersCount) badgePlayersCount.textContent = totalReg;
 
-        if (total === 0) {
+        // Leaderboard Count
+        const totalScores = leaderboardList.length;
+        if (badgeLeaderboardCount) badgeLeaderboardCount.textContent = totalScores;
+
+        if (totalScores === 0) {
             if (statTopScore) statTopScore.textContent = '0';
             if (statTopDept) statTopDept.textContent = 'None';
             if (statAvgScore) statAvgScore.textContent = '0';
@@ -75,17 +114,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Top Score
-        const topScore = Math.max(...recordsList.map(r => r.score || 0));
+        const topScore = Math.max(...leaderboardList.map(r => r.score || 0));
         if (statTopScore) statTopScore.textContent = topScore;
 
         // Average Score
-        const sumScore = recordsList.reduce((acc, r) => acc + (r.score || 0), 0);
-        const avgScore = Math.round(sumScore / total);
+        const sumScore = leaderboardList.reduce((acc, r) => acc + (r.score || 0), 0);
+        const avgScore = Math.round(sumScore / totalScores);
         if (statAvgScore) statAvgScore.textContent = avgScore;
 
-        // Top Department (Highest Total Score or Count)
+        // Top Department (Highest total cumulative score)
         const deptScores = {};
-        recordsList.forEach(r => {
+        leaderboardList.forEach(r => {
             if (!r.department) return;
             const shortDept = r.department.replace('Department of ', '');
             deptScores[shortDept] = (deptScores[shortDept] || 0) + (r.score || 0);
@@ -103,41 +142,111 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 3. Render Leaderboard Data Table
+    // 4. Render Registered Players Table
     // ----------------------------------------------------------------------
-    function renderTable() {
-        if (!tableBody) return;
-        tableBody.innerHTML = '';
+    function renderPlayersTable() {
+        if (!playersTableBody) return;
+        playersTableBody.innerHTML = '';
 
         const searchVal = (searchInput ? searchInput.value : '').toLowerCase().trim();
         const selectedDept = deptFilter ? deptFilter.value : 'ALL';
         const selectedYear = yearFilter ? yearFilter.value : 'ALL';
 
-        const filteredList = recordsList.filter(record => {
-            // Search name
-            const nameMatch = !searchVal || (record.name || '').toLowerCase().includes(searchVal);
-            
-            // Department filter
-            const deptMatch = selectedDept === 'ALL' || record.department === selectedDept;
+        const filtered = playersList.filter(item => {
+            const nameMatch = !searchVal || 
+                (item.name || '').toLowerCase().includes(searchVal) ||
+                (item.rollNumber || '').toLowerCase().includes(searchVal);
 
-            // Year filter
-            const yearMatch = selectedYear === 'ALL' || record.year === selectedYear;
+            const deptMatch = selectedDept === 'ALL' || item.department === selectedDept;
+            const yearMatch = selectedYear === 'ALL' || item.year === selectedYear;
 
             return nameMatch && deptMatch && yearMatch;
         });
 
-        if (filteredList.length === 0) {
-            tableBody.innerHTML = `
+        if (filtered.length === 0) {
+            playersTableBody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
-                        No records match the current filter criteria.
+                    <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                        No registered players match the current criteria.
                     </td>
                 </tr>
             `;
             return;
         }
 
-        filteredList.forEach((item, idx) => {
+        filtered.forEach((item, idx) => {
+            const tr = document.createElement('tr');
+            const deptDisplay = item.department ? item.department.replace('Department of ', '') : '—';
+            const rollDisplay = item.rollNumber || '—';
+            const yearDisplay = item.year || '—';
+            const dateDisplay = item.dateDisplay || '—';
+
+            tr.innerHTML = `
+                <td><strong class="gold-text">${escapeHtml(rollDisplay)}</strong></td>
+                <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
+                <td>${escapeHtml(deptDisplay)}</td>
+                <td><span class="diff-chip diff-medium">${escapeHtml(yearDisplay)}</span></td>
+                <td>${escapeHtml(dateDisplay)}</td>
+                <td style="text-align: right;">
+                    <button class="delete-row-btn" data-id="${item.id}" data-name="${escapeHtml(item.name || 'Player')}" title="Delete registration">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                </td>
+            `;
+            playersTableBody.appendChild(tr);
+        });
+
+        // Event Handlers for delete player
+        playersTableBody.querySelectorAll('.delete-row-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                const name = btn.getAttribute('data-name');
+                if (confirm(`Are you sure you want to delete registration for "${name}"?`)) {
+                    if (window.WordQuestFirebase && window.WordQuestFirebase.deletePlayerFromFirestore) {
+                        window.WordQuestFirebase.deletePlayerFromFirestore(id);
+                    }
+                    playersList = playersList.filter(p => p.id !== id);
+                    updateStats();
+                    renderPlayersTable();
+                }
+            });
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // 5. Render Leaderboard Data Table
+    // ----------------------------------------------------------------------
+    function renderLeaderboardTable() {
+        if (!leaderboardTableBody) return;
+        leaderboardTableBody.innerHTML = '';
+
+        const searchVal = (searchInput ? searchInput.value : '').toLowerCase().trim();
+        const selectedDept = deptFilter ? deptFilter.value : 'ALL';
+        const selectedYear = yearFilter ? yearFilter.value : 'ALL';
+
+        const filtered = leaderboardList.filter(record => {
+            const nameMatch = !searchVal || 
+                (record.name || '').toLowerCase().includes(searchVal) ||
+                (record.rollNumber || '').toLowerCase().includes(searchVal);
+
+            const deptMatch = selectedDept === 'ALL' || record.department === selectedDept;
+            const yearMatch = selectedYear === 'ALL' || record.year === selectedYear;
+
+            return nameMatch && deptMatch && yearMatch;
+        });
+
+        if (filtered.length === 0) {
+            leaderboardTableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                        No leaderboard entries match the current filter criteria.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        filtered.forEach((item, idx) => {
             const tr = document.createElement('tr');
             
             let rankBadge = `${idx + 1}`;
@@ -145,60 +254,62 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (idx === 1) rankBadge = '🥈';
             else if (idx === 2) rankBadge = '🥉';
 
+            const rollDisplay = item.rollNumber || '—';
             const deptDisplay = item.department ? item.department.replace('Department of ', '') : '—';
             const yearDisplay = item.year || '—';
             const dateDisplay = item.date || new Date().toLocaleDateString();
 
             tr.innerHTML = `
                 <td><strong>${rankBadge}</strong></td>
+                <td><strong class="gold-text">${escapeHtml(rollDisplay)}</strong></td>
                 <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
                 <td>${escapeHtml(deptDisplay)}</td>
                 <td><span class="diff-chip diff-medium">${escapeHtml(yearDisplay)}</span></td>
                 <td><strong class="gold-text">${item.score || 0}</strong></td>
                 <td>${escapeHtml(dateDisplay)}</td>
                 <td style="text-align: right;">
-                    <button class="delete-row-btn" data-index="${idx}" title="Delete entry">
+                    <button class="delete-row-btn" data-id="${item.id}" data-name="${escapeHtml(item.name || 'Player')}" title="Delete score entry">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     </button>
                 </td>
             `;
-
-            tableBody.appendChild(tr);
+            leaderboardTableBody.appendChild(tr);
         });
 
-        // Add Delete Event Handlers
-        tableBody.querySelectorAll('.delete-row-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const targetIdx = parseInt(btn.getAttribute('data-index'), 10);
-                deleteRecord(filteredList[targetIdx]);
+        // Event Handlers for delete score
+        leaderboardTableBody.querySelectorAll('.delete-row-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                const name = btn.getAttribute('data-name');
+                if (confirm(`Are you sure you want to delete score entry for "${name}"?`)) {
+                    if (window.WordQuestFirebase && window.WordQuestFirebase.deleteScoreFromFirestore) {
+                        window.WordQuestFirebase.deleteScoreFromFirestore(id);
+                    }
+                    leaderboardList = leaderboardList.filter(r => r.id !== id);
+                    saveLeaderboard();
+                    updateStats();
+                    renderLeaderboardTable();
+                }
             });
         });
     }
 
-    // Helper: Delete record
-    function deleteRecord(recordToDelete) {
-        if (!recordToDelete) return;
-        if (confirm(`Are you sure you want to delete entry for "${recordToDelete.name}"?`)) {
-            if (recordToDelete.id && window.WordQuestFirebase && window.WordQuestFirebase.deleteScoreFromFirestore) {
-                window.WordQuestFirebase.deleteScoreFromFirestore(recordToDelete.id);
-            }
-            recordsList = recordsList.filter(r => r !== recordToDelete);
-            saveRecords();
-            updateStats();
-            renderTable();
-        }
+    function saveLeaderboard() {
+        try {
+            localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(leaderboardList));
+        } catch (e) {}
     }
 
-    function saveRecords() {
-        try {
-            localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(recordsList));
-        } catch (e) {
-            console.warn('Error saving leaderboard records:', e);
+    function renderCurrentTab() {
+        if (currentTab === 'players') {
+            renderPlayersTable();
+        } else {
+            renderLeaderboardTable();
         }
     }
 
     // ----------------------------------------------------------------------
-    // 4. Word Bank Manager
+    // 6. Word Bank Manager
     // ----------------------------------------------------------------------
     function renderWordTags() {
         if (!wordsTagContainer) return;
@@ -214,7 +325,6 @@ document.addEventListener('DOMContentLoaded', () => {
             wordsTagContainer.appendChild(tag);
         });
 
-        // Add Remove Word Handlers
         wordsTagContainer.querySelectorAll('.word-tag-remove').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idx = parseInt(btn.getAttribute('data-index'), 10);
@@ -256,9 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveWordBank() {
         try {
             localStorage.setItem(STORAGE_KEY_CUSTOM_WORDS, JSON.stringify(customWordsList));
-        } catch (e) {
-            console.warn('Error saving word bank:', e);
-        }
+        } catch (e) {}
 
         if (window.WordQuestFirebase && window.WordQuestFirebase.saveWordBankToFirestore) {
             window.WordQuestFirebase.saveWordBankToFirestore(customWordsList);
@@ -273,60 +381,73 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 5. CSV Export Functionality
+    // 7. CSV Export Functionality
     // ----------------------------------------------------------------------
     function exportToCSV() {
-        if (recordsList.length === 0) {
-            alert('No records available to export.');
-            return;
-        }
-
         let csvContent = 'data:text/csv;charset=utf-8,';
-        csvContent += 'Rank,Player Name,Department,Year of Study,Score,Date\n';
 
-        recordsList.forEach((r, idx) => {
-            const name = `"${(r.name || '').replace(/"/g, '""')}"`;
-            const dept = `"${(r.department || '').replace(/"/g, '""')}"`;
-            const year = `"${(r.year || '').replace(/"/g, '""')}"`;
-            const score = r.score || 0;
-            const date = `"${(r.date || '').replace(/"/g, '""')}"`;
-
-            csvContent += `${idx + 1},${name},${dept},${year},${score},${date}\n`;
-        });
+        if (currentTab === 'players') {
+            if (playersList.length === 0) {
+                alert('No registered players to export.');
+                return;
+            }
+            csvContent += 'Roll Number,Player Name,Department,Year of Study,Registered Date\n';
+            playersList.forEach(p => {
+                const roll = `"${(p.rollNumber || '').replace(/"/g, '""')}"`;
+                const name = `"${(p.name || '').replace(/"/g, '""')}"`;
+                const dept = `"${(p.department || '').replace(/"/g, '""')}"`;
+                const year = `"${(p.year || '').replace(/"/g, '""')}"`;
+                const date = `"${(p.dateDisplay || '').replace(/"/g, '""')}"`;
+                csvContent += `${roll},${name},${dept},${year},${date}\n`;
+            });
+        } else {
+            if (leaderboardList.length === 0) {
+                alert('No leaderboard records to export.');
+                return;
+            }
+            csvContent += 'Rank,Roll Number,Player Name,Department,Year of Study,Score,Date\n';
+            leaderboardList.forEach((r, idx) => {
+                const roll  = `"${(r.rollNumber || '').replace(/"/g, '""')}"`;
+                const name  = `"${(r.name || '').replace(/"/g, '""')}"`;
+                const dept  = `"${(r.department || '').replace(/"/g, '""')}"`;
+                const year  = `"${(r.year || '').replace(/"/g, '""')}"`;
+                const score = r.score || 0;
+                const date  = `"${(r.date || '').replace(/"/g, '""')}"`;
+                csvContent += `${idx + 1},${roll},${name},${dept},${year},${score},${date}\n`;
+            });
+        }
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `WordQuest_Leaderboard_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute('download', `WordQuest_${currentTab === 'players' ? 'Registered_Players' : 'Leaderboard'}_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     }
 
-    if (exportBtn) {
-        exportBtn.addEventListener('click', exportToCSV);
-    }
+    if (exportBtn) exportBtn.addEventListener('click', exportToCSV);
 
     // ----------------------------------------------------------------------
-    // 6. Reset All Data
+    // 8. Reset Data Button
     // ----------------------------------------------------------------------
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to reset all leaderboard and player records? This action cannot be undone.')) {
-                recordsList = [];
-                saveRecords();
+            if (confirm('Are you sure you want to reset local leaderboard cache? This will not erase Firestore remote entries.')) {
+                leaderboardList = [];
+                saveLeaderboard();
                 updateStats();
-                renderTable();
+                renderCurrentTab();
             }
         });
     }
 
     // ----------------------------------------------------------------------
-    // 7. Event Listeners for Filters
+    // 9. Filter Event Listeners
     // ----------------------------------------------------------------------
-    if (searchInput) searchInput.addEventListener('input', renderTable);
-    if (deptFilter) deptFilter.addEventListener('change', renderTable);
-    if (yearFilter) yearFilter.addEventListener('change', renderTable);
+    if (searchInput) searchInput.addEventListener('input', renderCurrentTab);
+    if (deptFilter)  deptFilter.addEventListener('change', renderCurrentTab);
+    if (yearFilter)  yearFilter.addEventListener('change', renderCurrentTab);
 
     // Escape HTML Helper
     function escapeHtml(str) {
@@ -339,44 +460,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 8. Boot Admin Controller & Firebase Live Sync
+    // 10. Boot Admin Controller & Firebase Live Sync
     // ----------------------------------------------------------------------
     function initFirebaseSync() {
-        if (window.WordQuestFirebase && window.WordQuestFirebase.subscribeToLeaderboard) {
-            window.WordQuestFirebase.subscribeToLeaderboard((firestoreList) => {
-                if (Array.isArray(firestoreList) && firestoreList.length > 0) {
-                    recordsList = firestoreList;
-                    saveRecords();
+        if (!window.WordQuestFirebase) return;
+
+        // 1. Subscribe to Live Registered Players
+        if (window.WordQuestFirebase.subscribeToPlayers) {
+            window.WordQuestFirebase.subscribeToPlayers((list) => {
+                if (Array.isArray(list)) {
+                    playersList = list;
                     updateStats();
-                    renderTable();
+                    if (currentTab === 'players') renderPlayersTable();
                 }
             });
+        }
 
-            if (window.WordQuestFirebase.getWordBankFromFirestore) {
-                window.WordQuestFirebase.getWordBankFromFirestore().then((remoteWords) => {
-                    if (Array.isArray(remoteWords) && remoteWords.length >= 8) {
-                        customWordsList = remoteWords;
-                        try {
-                            localStorage.setItem(STORAGE_KEY_CUSTOM_WORDS, JSON.stringify(customWordsList));
-                        } catch (e) {}
-                        renderWordTags();
-                    }
-                });
-            }
+        // 2. Subscribe to Live Leaderboard Scores
+        if (window.WordQuestFirebase.subscribeToLeaderboard) {
+            window.WordQuestFirebase.subscribeToLeaderboard((list) => {
+                if (Array.isArray(list)) {
+                    leaderboardList = list;
+                    saveLeaderboard();
+                    updateStats();
+                    if (currentTab === 'leaderboard') renderLeaderboardTable();
+                }
+            });
+        }
 
-            // Live games counter
-            if (window.WordQuestFirebase.subscribeToActiveGameCount) {
-                window.WordQuestFirebase.subscribeToActiveGameCount((count) => {
-                    const liveEl = document.getElementById('stat-live-games');
-                    if (liveEl) liveEl.textContent = count;
-                });
-            }
+        // 3. Fetch Word Bank
+        if (window.WordQuestFirebase.getWordBankFromFirestore) {
+            window.WordQuestFirebase.getWordBankFromFirestore().then((remoteWords) => {
+                if (Array.isArray(remoteWords) && remoteWords.length >= 8) {
+                    customWordsList = remoteWords;
+                    try {
+                        localStorage.setItem(STORAGE_KEY_CUSTOM_WORDS, JSON.stringify(customWordsList));
+                    } catch (e) {}
+                    renderWordTags();
+                }
+            });
+        }
+
+        // 4. Live Games Counter
+        if (window.WordQuestFirebase.subscribeToActiveGameCount) {
+            window.WordQuestFirebase.subscribeToActiveGameCount((count) => {
+                const liveEl = document.getElementById('stat-live-games');
+                if (liveEl) liveEl.textContent = count;
+            });
         }
     }
 
     loadData();
     updateStats();
-    renderTable();
+    renderPlayersTable();
     renderWordTags();
     initFirebaseSync();
 });

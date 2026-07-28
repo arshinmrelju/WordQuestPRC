@@ -225,6 +225,43 @@ export function subscribeToActiveGameCount(callback) {
     }
 }
 
+/**
+ * Subscribe to Live Registered Players Updates
+ * @param {Function} callback Callback with list of player objects
+ */
+export function subscribeToPlayers(callback) {
+    try {
+        const q = query(collection(db, "players"), limit(200));
+        return onSnapshot(q, (snapshot) => {
+            const list = [];
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                let regDate = data.registeredAt && data.registeredAt.toDate ? data.registeredAt.toDate().toLocaleDateString() : (new Date().toLocaleDateString());
+                list.push({ id: docSnap.id, ...data, dateDisplay: regDate });
+            });
+            callback(list);
+        }, (error) => {
+            console.warn("Firestore players snapshot error:", error);
+        });
+    } catch (e) {
+        console.warn("Firestore players subscription error:", e);
+    }
+}
+
+/**
+ * Delete a Player Registration Record from Firestore
+ * @param {String} docId Document ID to delete
+ */
+export async function deletePlayerFromFirestore(docId) {
+    if (!docId) return;
+    try {
+        await deleteDoc(doc(db, "players", docId));
+        console.log("Player document deleted from Firestore:", docId);
+    } catch (e) {
+        console.warn("Firestore delete player error:", e);
+    }
+}
+
 // Make available globally for non-module scripts if needed
 window.WordQuestFirebase = {
     app,
@@ -236,7 +273,10 @@ window.WordQuestFirebase = {
     getWordBankFromFirestore,
     registerPlayer,
     getPlayerByRollNumber,
+    subscribeToPlayers,
+    deletePlayerFromFirestore,
     registerActiveGame,
     unregisterActiveGame,
     subscribeToActiveGameCount
 };
+
