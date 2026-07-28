@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Quest — English Department Carnival</title>
+    <meta name="description"
+        content="Challenge your vocabulary and beat the clock in Word Quest, the ultimate word game for the English Department Carnival.">
+    <!-- Google Fonts: Cinzel & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Firebase Service Integration -->
+    <script type="module" src="firebase-service.js"></script>
+</head>
+
+<body class="executive-theme">
+    <!-- Background Grid Mesh (Clean Academic Texture) -->
+    <div class="bg-grid-mesh" aria-hidden="true"></div>
+
+    <!-- Main Container -->
+    <div class="app-container">
+
+        <!-- Modern Executive Header Bar -->
+        <header class="app-header animate-fade-in">
+            <div class="header-inner">
+                <div class="header-brand">
+                    <div class="header-logo-icon">
+                        <span class="logo-letter">W</span>
+                        <span class="logo-letter logo-letter-accent">Q</span>
+                    </div>
+                    <div class="header-brand-info">
+                        <h1 class="header-app-title">Word <span class="gold-text">Quest</span></h1>
+                    </div>
+                </div>
+
+                <div class="header-right-group">
+                    <div class="header-badge">
+                        <span class="badge-icon">🏛️</span>
+                        <span class="badge-text">English Dept Carnival 2026</span>
+                    </div>
+                    <a href="admin.html" class="header-admin-link" title="Admin Control Panel">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span>Admin</span>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Tagline -->
+        <section class="hero-section animate-fade-in">
+            <p class="hero-subtitle">Challenge Your Vocabulary. Master the Clock.</p>
+        </section>
+
+        <!-- Content Grid: Player Form & Game Rules -->
+        <main class="content-grid">
+
+            <!-- Player Registration Card -->
+            <section class="glass-card card-entrance player-card" id="player-card">
+                <div class="card-header">
+                    <div class="card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="card-title">Player Profile</h2>
+                        <p class="card-desc">Enter your credentials to enter the competition</p>
+                    </div>
+                </div>
+
+                <form id="player-form" class="player-form" novalidate>
+                    <!-- Player Name Field -->
+                    <div class="form-group">
+                        <label for="player-name" class="form-label">Player Name</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="player-name" class="glass-input" placeholder="Enter your name..."
+                                maxlength="20" autocomplete="off" required>
+                            <span class="input-focus-border"></span>
+                        </div>
+                        <div id="name-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
+                    <!-- Department Selection Field -->
+                    <div class="form-group">
+                        <label for="department" class="form-label">Department</label>
+                        <div class="select-wrapper">
+                            <select id="department" class="glass-input glass-select" required>
+                                <option value="" disabled selected>Select your department...</option>
+                                <option value="Department of Biochemistry">Department of Biochemistry</option>
+                                <option value="Department of Commerce">Department of Commerce</option>
+                                <option value="Department of Economics">Department of Economics</option>
+                                <option value="Department of English">Department of English</option>
+                                <option value="Department of History">Department of History</option>
+                                <option value="Department of Journalism and Mass Communication">Department of Journalism
+                                    and Mass Communication</option>
+                                <option value="Department of Microbiology">Department of Microbiology</option>
+                                <option value="Department of Travel and Tourism">Department of Travel and Tourism
+                                </option>
+                            </select>
+                            <div class="select-arrow">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div id="department-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
+                    <!-- Year of Study Selection Field -->
+                    <div class="form-group">
+                        <label for="year-of-study" class="form-label">Year of Study</label>
+                        <div class="select-wrapper">
+                            <select id="year-of-study" class="glass-input glass-select" required>
+                                <option value="" disabled selected>Select your year of study...</option>
+                                <option value="1st Year">1st Year</option>
+                                <option value="2nd Year">2nd Year</option>
+                                <option value="3rd Year">3rd Year</option>
+                                <option value="1st Year PG">1st Year (PG)</option>
+                                <option value="2nd Year PG">2nd Year (PG)</option>
+                            </select>
+                            <div class="select-arrow">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div id="year-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" id="start-btn" class="glass-btn btn-primary">
+                        <span class="btn-text">Begin Quest</span>
+                        <span class="btn-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg>
+                        </span>
+                    </button>
+                </form>
+            </section>
+
+            <!-- Word Quest Gameplay Guide Card -->
+            <section class="glass-card card-entrance rules-card" id="rules-card">
+                <div class="card-header">
+                    <div class="card-icon card-icon-gold">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polygon points="12 8 8 16 16 16 12 8" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="card-title">How to Play Word Quest</h2>
+                        <p class="card-desc">Find all hidden words &amp; beat the clock to score top rank</p>
+                    </div>
+                </div>
+
+                <div class="rounds-list">
+                    <!-- Step 1 -->
+                    <div class="round-item">
+                        <div class="round-badge">01</div>
+                        <div class="round-content">
+                            <h3 class="round-title">Scan the Grid</h3>
+                            <p class="round-desc">Locate 8 hidden English vocabulary words scattered across a 12×12 letter matrix in all directions.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="round-item">
+                        <div class="round-badge round-badge-navy">02</div>
+                        <div class="round-content">
+                            <h3 class="round-title">Drag to Select</h3>
+                            <p class="round-desc">Click or touch and drag across letters horizontally, vertically, or diagonally to form words.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="round-item">
+                        <div class="round-badge round-badge-gold">03</div>
+                        <div class="round-content">
+                            <h3 class="round-title">Score &amp; Beat the Clock</h3>
+                            <p class="round-desc">Earn +10 points per word found plus extra bonus points for remaining seconds on the timer.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Directives Footer -->
+                <div class="rules-footer">
+                    <div class="rule-chip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        <span>2-Min Timer</span>
+                    </div>
+                    <div class="rule-chip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                        </svg>
+                        <span>8 Hidden Words</span>
+                    </div>
+                    <div class="rule-chip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="8" r="7" />
+                            <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+                        </svg>
+                        <span>Leaderboard</span>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer animate-fade-in">
+            <p>&copy; 2026 Word Quest &bull; <strong>English Department Carnival</strong></p>
+        </footer>
+
+    </div>
+
+    <!-- Application Script -->
+    <script src="script.js"></script>
+</body>
+
+</html>

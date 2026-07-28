@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Quest — Admin Control Panel</title>
+    <meta name="description" content="Word Quest Admin Panel & Leaderboard Management - English Department Carnival 2026">
+    <!-- Google Fonts: Cinzel & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+
+<body class="executive-theme">
+    <!-- Background Grid Mesh -->
+    <div class="bg-grid-mesh" aria-hidden="true"></div>
+
+    <div class="admin-app-container">
+
+        <!-- Top Header Navigation -->
+        <header class="app-header animate-fade-in">
+            <div class="header-inner">
+                <div class="header-brand">
+                    <a href="index.html" class="header-back-btn" title="Back to Main Menu">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        <span>Portal</span>
+                    </a>
+                    <div class="header-logo-icon">
+                        <span class="logo-letter">W</span>
+                        <span class="logo-letter logo-letter-accent">Q</span>
+                    </div>
+                    <div class="header-brand-info">
+                        <h1 class="header-app-title">Word <span class="gold-text">Quest</span></h1>
+                        <span class="admin-badge-subtitle">Admin Control Panel</span>
+                    </div>
+                </div>
+
+                <div class="header-actions-group">
+                    <button id="export-csv-btn" class="glass-btn btn-secondary btn-sm">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span>Export CSV</span>
+                    </button>
+                    <button id="clear-data-btn" class="glass-btn btn-danger btn-sm">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        <span>Reset Data</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Overview Cards Grid -->
+        <section class="admin-stats-grid animate-fade-in">
+            <div class="glass-card stat-widget">
+                <div class="widget-icon widget-icon-gold">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div class="widget-data">
+                    <span class="widget-label">Total Registered</span>
+                    <h3 class="widget-value" id="stat-total-players">0</h3>
+                </div>
+            </div>
+
+            <div class="glass-card stat-widget">
+                <div class="widget-icon widget-icon-blue">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
+                </div>
+                <div class="widget-data">
+                    <span class="widget-label">Highest Score</span>
+                    <h3 class="widget-value gold-text" id="stat-top-score">0</h3>
+                </div>
+            </div>
+
+            <div class="glass-card stat-widget">
+                <div class="widget-icon widget-icon-green">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                </div>
+                <div class="widget-data">
+                    <span class="widget-label">Top Department</span>
+                    <h3 class="widget-value widget-text-sm" id="stat-top-dept">None</h3>
+                </div>
+            </div>
+
+            <div class="glass-card stat-widget">
+                <div class="widget-icon widget-icon-purple">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                </div>
+                <div class="widget-data">
+                    <span class="widget-label">Average Score</span>
+                    <h3 class="widget-value" id="stat-avg-score">0</h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Management Grid -->
+        <main class="admin-main-grid">
+
+            <!-- Player & Leaderboard Management Section -->
+            <section class="glass-card admin-card">
+                <div class="admin-card-header">
+                    <div class="card-title-group">
+                        <div class="card-icon card-icon-gold">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="card-title">Live Leaderboard &amp; Registrations</h2>
+                            <p class="card-desc">Search, filter, and manage participant records across departments</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters & Controls Bar -->
+                <div class="admin-filters-bar">
+                    <!-- Search Input -->
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="admin-search-input" class="glass-input search-input" placeholder="Search player name...">
+                    </div>
+
+                    <!-- Department Filter -->
+                    <div class="filter-wrapper">
+                        <select id="admin-dept-filter" class="glass-input glass-select filter-select">
+                            <option value="ALL">All Departments</option>
+                            <option value="Department of Biochemistry">Biochemistry</option>
+                            <option value="Department of Commerce">Commerce</option>
+                            <option value="Department of Economics">Economics</option>
+                            <option value="Department of English">English</option>
+                            <option value="Department of History">History</option>
+                            <option value="Department of Journalism and Mass Communication">Journalism</option>
+                            <option value="Department of Microbiology">Microbiology</option>
+                            <option value="Department of Travel and Tourism">Travel &amp; Tourism</option>
+                        </select>
+                    </div>
+
+                    <!-- Year Filter -->
+                    <div class="filter-wrapper">
+                        <select id="admin-year-filter" class="glass-input glass-select filter-select">
+                            <option value="ALL">All Years</option>
+                            <option value="1st Year">1st Year</option>
+                            <option value="2nd Year">2nd Year</option>
+                            <option value="3rd Year">3rd Year</option>
+                            <option value="1st Year PG">1st Year (PG)</option>
+                            <option value="2nd Year PG">2nd Year (PG)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Data Table -->
+                <div class="table-wrapper">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Player Name</th>
+                                <th>Department</th>
+                                <th>Year</th>
+                                <th>Score</th>
+                                <th>Date</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body">
+                            <!-- Populated dynamically via admin.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Sidebar: Word Bank & System Config -->
+            <aside class="admin-sidebar">
+
+                <!-- Word Bank Editor Card -->
+                <section class="glass-card admin-card">
+                    <div class="admin-card-header">
+                        <div class="card-title-group">
+                            <div class="card-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            </div>
+                            <div>
+                                <h2 class="card-title">Word Bank Manager</h2>
+                                <p class="card-desc">Add or remove active search puzzle words</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add Word Form -->
+                    <form id="add-word-form" class="add-word-form">
+                        <div class="input-wrapper">
+                            <input type="text" id="new-word-input" class="glass-input" placeholder="Enter word (e.g. HARMONY)" maxlength="12" style="text-transform: uppercase;">
+                        </div>
+                        <button type="submit" class="glass-btn btn-primary btn-sm">Add Word</button>
+                    </form>
+
+                    <!-- Active Words Tags -->
+                    <div id="words-tag-container" class="words-tag-container">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+
+            </aside>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer animate-fade-in">
+            <p>&copy; 2026 Word Quest &bull; <strong>English Department Carnival Admin Panel</strong></p>
+        </footer>
+
+    </div>
+
+    <!-- Firebase Service Integration -->
+    <script type="module" src="firebase-service.js"></script>
+    <!-- Admin Logic Script -->
+    <script src="admin.js"></script>
+</body>
+
+</html>
