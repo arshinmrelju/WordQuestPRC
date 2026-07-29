@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const KEY_ROLL       = 'wordQuest_rollNumber';
     const KEY_DEPARTMENT = 'wordQuest_department';
     const KEY_YEAR       = 'wordQuest_yearOfStudy';
+    const KEY_PLAYER_ID  = 'wordQuest_playerFirestoreId';
 
     // ------------------------------------------------------------------
     // 2. Floating Background Letters
@@ -206,8 +207,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 showErr(playerNameInput, nameError, name ? 'Name must be at least 2 characters.' : 'Please enter your player name.');
                 hasError = true;
             }
-            if (!roll || roll.length < 2) {
-                showErr(rollNumberInput, rollError, 'Please enter your roll number.');
+            if (!roll) {
+                showErr(rollNumberInput, rollError, 'Please select your roll number.');
                 hasError = true;
             }
             if (!dept) {
@@ -237,10 +238,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? fb.registerPlayer({ name, rollNumber: roll, department: dept, year })
                     : Promise.resolve(null);
 
-                doRegister.then(() => {
-                    launchGame(null); // btn already updated above
+                doRegister.then((docId) => {
+                    if (docId) localStorage.setItem(KEY_PLAYER_ID, docId);
+                    launchGame(null);
                 }).catch(() => {
-                    launchGame(null); // still proceed even if Firebase fails
+                    launchGame(null);
                 });
             });
         });
@@ -259,8 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let hasError = false;
 
-            if (!roll || roll.length < 2) {
-                showErr(retRollInput, retRollError, 'Please enter your roll number.');
+            if (!roll) {
+                showErr(retRollInput, retRollError, 'Please select your roll number.');
                 hasError = true;
             }
             if (!dept) {
@@ -313,6 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Found — restore profile and go
                     saveToStorage(player.name || 'Player', roll, dept, year);
+                    if (player.id) localStorage.setItem(KEY_PLAYER_ID, player.id);
                     launchGame(retStartBtn);
 
                 } catch (err) {

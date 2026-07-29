@@ -18,6 +18,7 @@ import {
     onSnapshot,
     setDoc,
     getDoc,
+    updateDoc,
     serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -176,49 +177,53 @@ export async function getPlayerByRollNumber(rollNumber, department, year) {
 }
 
 /**
- * Register a live game session in Firestore
- * @returns {String} The session document ID
+ * Mark the player's document as active (game started)
+ * Reads the player's Firestore doc ID from localStorage.
  */
-let _activeGameDocId = null;
 export async function registerActiveGame() {
+    const playerId = localStorage.getItem('wordQuest_playerFirestoreId');
+    if (!playerId) return null;
     try {
-        const docRef = await addDoc(collection(db, "active_games"), {
-            startedAt: serverTimestamp()
+        await updateDoc(doc(db, "players", playerId), {
+            active: true,
+            gameStartedAt: serverTimestamp()
         });
-        _activeGameDocId = docRef.id;
-        console.log("Active game registered:", docRef.id);
-        return docRef.id;
+        console.log("Player marked active:", playerId);
+        return playerId;
     } catch (e) {
-        console.warn("Failed to register active game:", e);
+        console.warn("Failed to mark player active:", e);
         return null;
     }
 }
 
 /**
- * Remove the active game session from Firestore (on finish or unload)
+ * Mark the player's document as inactive (game finished or left)
  */
 export async function unregisterActiveGame() {
-    const id = _activeGameDocId;
-    if (!id) return;
+    const playerId = localStorage.getItem('wordQuest_playerFirestoreId');
+    if (!playerId) return;
     try {
-        await deleteDoc(doc(db, "active_games", id));
-        _activeGameDocId = null;
-        console.log("Active game unregistered:", id);
+        await updateDoc(doc(db, "players", playerId), {
+            active: false,
+            gameStartedAt: null
+        });
+        console.log("Player marked inactive:", playerId);
     } catch (e) {
-        console.warn("Failed to unregister active game:", e);
+        console.warn("Failed to mark player inactive:", e);
     }
 }
 
 /**
- * Subscribe to the count of currently active game sessions
- * @param {Function} callback Called with the live game count (number)
+ * Subscribe to the count of active players
+ * @param {Function} callback Called with the live count (number)
  */
 export function subscribeToActiveGameCount(callback) {
     try {
-        return onSnapshot(collection(db, "active_games"), (snapshot) => {
+        const q = query(collection(db, "players"), where("active", "==", true));
+        return onSnapshot(q, (snapshot) => {
             callback(snapshot.size);
         }, (error) => {
-            console.warn("Active games snapshot error:", error);
+            console.warn("Active players snapshot error:", error);
         });
     } catch (e) {
         console.warn("subscribeToActiveGameCount error:", e);
