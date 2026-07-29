@@ -187,6 +187,12 @@ body {
     white-space: nowrap;
 }
 
+.badge-img {
+    height: 22px;
+    width: auto;
+    display: block;
+}
+
 .header-admin-link {
     display: inline-flex;
     align-items: center;
