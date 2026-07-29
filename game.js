@@ -48,6 +48,7 @@ class WordSearch {
         this.placed     = {};        // word → [{r,c},...] cell list
         this.foundWords = new Set(); // words found so far
         this.score      = 0;
+        this.cumulativeScore = 0;
 
         /* selection state */
         this.selecting  = false;
@@ -61,6 +62,7 @@ class WordSearch {
 
     /* ── BOOT ─────────────────────────────────── */
     init() {
+        this._loadCumulativeScore();
         this._displayPlayerBadge();
         this._pickWords();
         this._buildGrid();
@@ -70,6 +72,8 @@ class WordSearch {
         this._renderWordList();
         this._bindEvents();
         this._startTimer();
+        this._updateHUD();
+        this._renderHistory();
         this._registerActiveGame();
 
         // Load custom word bank from Firestore (for next game or restart)
@@ -82,7 +86,7 @@ class WordSearch {
         document.getElementById('overlay-end')?.classList.add('hidden');
         document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
 
-        // reset state
+        // reset state (keep cumulative)
         this.grid       = [];
         this.placed     = {};
         this.foundWords = new Set();
@@ -101,6 +105,7 @@ class WordSearch {
         this._bindEvents();
         this._startTimer();
         this._updateHUD();
+        this._renderHistory();
         this._registerActiveGame();
     }
 
@@ -128,6 +133,46 @@ class WordSearch {
                 }
             }).catch(() => { /* fallback to localStorage already done */ });
         }
+    }
+
+    _loadCumulativeScore() {
+        const roll = localStorage.getItem('wordQuest_rollNumber') || '';
+        try {
+            this.cumulativeScore = parseInt(localStorage.getItem('wordQuest_cumulative_' + roll) || '0', 10) || 0;
+        } catch (e) {
+            this.cumulativeScore = 0;
+        }
+        const historyEl = document.getElementById('cumulative-score');
+        if (historyEl) historyEl.textContent = this.cumulativeScore;
+    }
+
+    _saveCumulativeScore() {
+        const roll = localStorage.getItem('wordQuest_rollNumber') || '';
+        try {
+            localStorage.setItem('wordQuest_cumulative_' + roll, String(this.cumulativeScore));
+        } catch (e) { /* noop */ }
+    }
+
+    _renderHistory() {
+        const container = document.getElementById('history-list');
+        if (!container) return;
+        const roll = localStorage.getItem('wordQuest_rollNumber') || '';
+        let history = [];
+        try {
+            history = JSON.parse(localStorage.getItem('wordQuest_history_' + roll) || '[]');
+        } catch (e) { history = []; }
+
+        container.innerHTML = '';
+        if (history.length === 0) {
+            container.innerHTML = '<div class="history-empty">No games played yet</div>';
+            return;
+        }
+        history.slice().reverse().forEach((entry, i) => {
+            const div = document.createElement('div');
+            div.className = 'history-row';
+            div.innerHTML = `<span class="history-game">#${history.length - i}</span><span class="history-score">${entry.score}</span><span class="history-date">${entry.date}</span>`;
+            container.appendChild(div);
+        });
     }
 
     _pickWords() {
@@ -425,6 +470,8 @@ class WordSearch {
         const score = document.getElementById('score-val');
         if (found) found.textContent = `${this.foundWords.size} / ${this.words.length}`;
         if (score) score.textContent = this.score;
+        const cumEl = document.getElementById('cumulative-score');
+        if (cumEl) cumEl.textContent = this.cumulativeScore;
     }
 
     /* ── TIMER ────────────────────────────────── */
@@ -492,6 +539,9 @@ class WordSearch {
         
         const numEl = document.getElementById('score-result-num');
         if (numEl) numEl.textContent = this.score;
+
+        const cumEl = document.getElementById('cumulative-result-num');
+        if (cumEl) cumEl.textContent = this.cumulativeScore;
         
         document.getElementById('overlay-end')?.classList.remove('hidden');
         document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
@@ -521,6 +571,9 @@ class WordSearch {
             
             const numEl = document.getElementById('score-result-num');
             if (numEl) numEl.textContent = this.score;
+
+            const cumEl = document.getElementById('cumulative-result-num');
+            if (cumEl) cumEl.textContent = this.cumulativeScore;
             
             document.getElementById('overlay-end')?.classList.remove('hidden');
             document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
@@ -588,13 +641,19 @@ class WordSearch {
         const department = localStorage.getItem('wordQuest_department')        || '';
         const year       = localStorage.getItem('wordQuest_yearOfStudy')       || '';
 
+        // Accumulate cumulative score
+        this.cumulativeScore += this.score;
+        this._saveCumulativeScore();
+
+        const today = new Date().toLocaleDateString();
         const record = {
             name,
             rollNumber,
             department,
             year,
             score: this.score,
-            date:  new Date().toLocaleDateString()
+            cumulativeScore: this.cumulativeScore,
+            date:  today
         };
 
         // 1. Save to localStorage leaderboard
@@ -606,10 +665,26 @@ class WordSearch {
             localStorage.setItem(key, JSON.stringify(list.slice(0, 100)));
         } catch { /* noop */ }
 
-        // 2. Save to Firestore (if Firebase module has loaded)
+        // 2. Save score history (per-player)
+        try {
+            const histKey = 'wordQuest_history_' + rollNumber;
+            const history = JSON.parse(localStorage.getItem(histKey) || '[]');
+            history.push({ score: this.score, cumulative: this.cumulativeScore, date: today });
+            localStorage.setItem(histKey, JSON.stringify(history));
+        } catch { /* noop */ }
+
+        // 3. Save to Firestore (if Firebase module has loaded)
         if (window.WordQuestFirebase && window.WordQuestFirebase.saveScoreToFirestore) {
             window.WordQuestFirebase.saveScoreToFirestore(record).catch(() => {
                 console.warn('Firestore score save failed — score is in localStorage.');
+            });
+        }
+
+        // 4. Save cumulative score to Firestore
+        if (window.WordQuestFirebase && window.WordQuestFirebase.saveCumulativeScoreToFirestore) {
+            window.WordQuestFirebase.saveCumulativeScoreToFirestore({
+                name, rollNumber, department, year,
+                cumulativeScore: this.cumulativeScore
             });
         }
     }

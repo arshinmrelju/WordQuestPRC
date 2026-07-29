@@ -49,6 +49,7 @@ export async function saveScoreToFirestore(scoreData) {
             year: scoreData.year || "",
             difficulty: scoreData.difficulty || "medium",
             score: scoreData.score || 0,
+            cumulativeScore: scoreData.cumulativeScore || 0,
             timestamp: serverTimestamp(),
             date: new Date().toLocaleDateString()
         });
@@ -92,6 +93,27 @@ export async function deleteScoreFromFirestore(docId) {
         console.log("Document deleted from Firestore:", docId);
     } catch (e) {
         console.warn("Firestore delete document error:", e);
+    }
+}
+
+/**
+ * Save or update cumulative player score to Firestore
+ * @param {Object} data { rollNumber, name, department, year, cumulativeScore }
+ */
+export async function saveCumulativeScoreToFirestore(data) {
+    try {
+        const docRef = doc(db, "cumulativeScores", data.rollNumber || 'anonymous');
+        await setDoc(docRef, {
+            name: data.name || "Player",
+            rollNumber: data.rollNumber || "",
+            department: data.department || "",
+            year: data.year || "",
+            cumulativeScore: data.cumulativeScore || 0,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        console.log("Cumulative score saved to Firestore:", data.cumulativeScore);
+    } catch (e) {
+        console.warn("Firestore cumulative score save error:", e);
     }
 }
 
@@ -282,6 +304,7 @@ window.WordQuestFirebase = {
     deletePlayerFromFirestore,
     registerActiveGame,
     unregisterActiveGame,
-    subscribeToActiveGameCount
+    subscribeToActiveGameCount,
+    saveCumulativeScoreToFirestore
 };
 

@@ -238,7 +238,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const bestByPlayer = {};
         leaderboardList.forEach(record => {
             const key = `${record.rollNumber || ''}|${record.department || ''}|${record.year || ''}`;
-            if (!bestByPlayer[key] || (record.score || 0) > (bestByPlayer[key].score || 0)) {
+            const existing = bestByPlayer[key];
+            const currCum = record.cumulativeScore || record.score || 0;
+            const existCum = existing ? (existing.cumulativeScore || existing.score || 0) : -1;
+            if (!existing || currCum > existCum) {
                 bestByPlayer[key] = record;
             }
         });
@@ -259,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filtered.length === 0) {
             leaderboardTableBody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                    <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
                         No leaderboard entries match the current filter criteria.
                     </td>
                 </tr>
@@ -279,6 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const deptDisplay = item.department ? item.department.replace('Department of ', '') : '—';
             const yearDisplay = item.year || '—';
             const dateDisplay = item.date || new Date().toLocaleDateString();
+            const cumScore = item.cumulativeScore || item.score || 0;
 
             tr.innerHTML = `
                 <td><strong>${rankBadge}</strong></td>
@@ -287,6 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${escapeHtml(deptDisplay)}</td>
                 <td><span class="diff-chip diff-medium">${escapeHtml(yearDisplay)}</span></td>
                 <td><strong class="gold-text">${item.score || 0}</strong></td>
+                <td><span class="cum-score">${cumScore}</span></td>
                 <td>${escapeHtml(dateDisplay)}</td>
                 <td style="text-align: right;">
                     <button class="delete-row-btn" data-id="${item.id}" data-name="${escapeHtml(item.name || 'Player')}" title="Delete score entry">

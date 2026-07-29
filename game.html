@@ -58,6 +58,10 @@
                     <span class="stat-capsule-label">Score</span>
                     <span class="stat-capsule-val gold-text" id="score-val">0</span>
                 </div>
+                <div class="stat-capsule stat-capsule-purple">
+                    <span class="stat-capsule-label">Total</span>
+                    <span class="stat-capsule-val" id="cumulative-score">0</span>
+                </div>
                 <div class="stat-capsule stat-capsule-timer" id="timer-capsule">
                     <span class="stat-capsule-label">Time</span>
                     <span class="stat-capsule-val timer-mono" id="timer-val">05:00</span>
@@ -103,6 +107,19 @@
                 </div>
             </section>
 
+            <!-- ── GAME HISTORY CARD ── -->
+            <section class="glass-card history-card animate-fade-in">
+                <div class="history-header">
+                    <div class="card-icon" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <p class="card-title">Your Game History</p>
+                </div>
+                <div id="history-list" class="history-list"></div>
+            </section>
+
         </main>
 
         <!-- ── FOOTER ── -->
@@ -123,7 +140,11 @@
 
             <div class="score-showcase">
                 <span class="score-showcase-num gold-text" id="score-result-num">0</span>
-                <span class="score-showcase-label">total points</span>
+                <span class="score-showcase-label">this game</span>
+            </div>
+            <div class="score-showcase score-showcase-sm">
+                <span class="score-showcase-num" id="cumulative-result-num">0</span>
+                <span class="score-showcase-label">cumulative total</span>
             </div>
 
             <div class="btn-group">

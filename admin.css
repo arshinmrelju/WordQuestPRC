@@ -359,6 +359,11 @@
     background: rgba(239, 68, 68, 0.15);
 }
 
+.cum-score {
+    color: #c084fc;
+    font-weight: 700;
+}
+
 /* Word Bank Manager */
 .add-word-form {
     display: flex;
