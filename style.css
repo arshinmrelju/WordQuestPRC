@@ -191,6 +191,7 @@ body {
     height: 32px;
     width: auto;
     display: block;
+    filter: brightness(1.3) contrast(1.1);
 }
 
 .header-admin-link {
