@@ -695,7 +695,7 @@
 
     .word-list-card {
         position: static;
-        order: 2;
+        order: 1;
     }
 
     .word-list {
@@ -705,7 +705,9 @@
 
     .word-list li { font-size: 0.75rem; padding: 0.35rem 0.65rem; }
 
-    .grid-card { order: 1; }
+    .grid-card { order: 2; }
+
+    .history-card { order: 3; }
 }
 
 @media (max-width: 640px) {
