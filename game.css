@@ -37,26 +37,35 @@
     flex-shrink: 0;
 }
 
-.back-home-btn {
+/* Player badge */
+.player-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.85rem;
-    background: rgba(255,255,255,0.05);
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    background: rgba(255,255,255,0.04);
     border: 1px solid var(--card-border);
     border-radius: var(--radius-full);
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-decoration: none;
-    transition: var(--transition-fast);
     flex-shrink: 0;
     white-space: nowrap;
 }
-.back-home-btn:hover {
-    background: rgba(255,255,255,0.1);
+.player-badge-icon {
+    color: var(--accent-gold);
+    flex-shrink: 0;
+}
+.player-badge-name {
+    font-size: 0.78rem;
+    font-weight: 600;
     color: var(--text-primary);
-    border-color: var(--accent-gold);
+}
+.player-badge-sep {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+.player-badge-dept {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-secondary);
 }
 
 /* Logo in header */
@@ -622,7 +631,7 @@
     }
 
     .game-header-logo { order: 1; }
-    .back-home-btn    { order: 2; }
+    .player-badge    { order: 2; }
 
     .game-header-title {
         font-size: 0.95rem;

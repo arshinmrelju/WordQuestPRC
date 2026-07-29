@@ -61,6 +61,7 @@ class WordSearch {
 
     /* ── BOOT ─────────────────────────────────── */
     init() {
+        this._displayPlayerBadge();
         this._pickWords();
         this._buildGrid();
         this._placeWords();
@@ -560,6 +561,22 @@ class WordSearch {
                 if (isHidden) reopenBtn.classList.remove('hidden');
                 else reopenBtn.classList.add('hidden');
             }
+        }
+    }
+
+    /* ── PLAYER BADGE ─────────────────────────── */
+    _displayPlayerBadge() {
+        const nameEl = document.getElementById('player-name-display');
+        const deptEl = document.getElementById('player-dept-display');
+        if (!nameEl || !deptEl) return;
+        const name = localStorage.getItem('wordQuest_playerName') || 'Player';
+        const dept = localStorage.getItem('wordQuest_department') || '—';
+        if (dept.startsWith('Department of ')) {
+            nameEl.textContent = name;
+            deptEl.textContent = dept.replace('Department of ', '');
+        } else {
+            nameEl.textContent = name;
+            deptEl.textContent = dept;
         }
     }
 

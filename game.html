@@ -24,12 +24,16 @@
         <!-- ── TOP BAR (matches index header aesthetic) ── -->
         <header class="game-top-bar animate-fade-in">
             <div class="top-bar-main">
-                <a href="index.html" class="back-home-btn" title="Main Menu">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="15 18 9 12 15 6"/>
+                <!-- Player badge -->
+                <div class="player-badge" id="player-badge">
+                    <svg class="player-badge-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
                     </svg>
-                    <span>Menu</span>
-                </a>
+                    <span class="player-badge-name" id="player-name-display">Player</span>
+                    <span class="player-badge-sep">|</span>
+                    <span class="player-badge-dept" id="player-dept-display">—</span>
+                </div>
 
                 <!-- Logo — same emblem as index -->
                 <div class="game-header-logo">
