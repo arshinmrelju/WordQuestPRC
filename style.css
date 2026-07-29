@@ -265,12 +265,65 @@ body {
     filter: drop-shadow(0 2px 10px rgba(217, 119, 6, 0.3));
 }
 
+.landing-top-bar {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.landing-hero {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 2rem 0 1.5rem;
+}
+
+.hero-badge {
+    display: inline-flex;
+    padding: 0.4rem 1.2rem;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(217, 119, 6, 0.35);
+    border-radius: var(--radius-full);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent-gold-light);
+    margin-bottom: 1rem;
+    letter-spacing: 0.04em;
+}
+
+.hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin: 1.25rem 0 1.75rem;
+    flex-wrap: wrap;
+}
+
+.hero-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.hero-stat-icon {
+    font-size: 1.1rem;
+}
+
+.hero-cta {
+    display: inline-flex;
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    text-decoration: none;
+}
+
 .hero-subtitle {
     font-size: clamp(0.9rem, 2.5vw, 1.15rem);
     color: var(--text-secondary);
     font-weight: 400;
     max-width: 580px;
-    margin: 0 auto;
+    margin: 0.75rem auto 0;
     letter-spacing: 0.02em;
 }
 

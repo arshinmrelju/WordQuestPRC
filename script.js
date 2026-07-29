@@ -329,8 +329,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ------------------------------------------------------------------
-    // 11. Boot
+    // 11. Leaderboard rendering
+    // ------------------------------------------------------------------
+    function renderLeaderboard() {
+        const tbody = document.getElementById('lb-body');
+        if (!tbody) return;
+        try {
+            const list = JSON.parse(localStorage.getItem('wordQuest_leaderboard') || '[]');
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; opacity:0.6; padding:1rem;">No scores yet! Be the first to play.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = '';
+            list.slice(0, 10).forEach((item, index) => {
+                const tr = document.createElement('tr');
+                let rank = `${index + 1}`;
+                if (index === 0) rank = '🥇';
+                else if (index === 1) rank = '🥈';
+                else if (index === 2) rank = '🥉';
+                const dept = item.department ? item.department.replace('Department of ', '') : '';
+                tr.innerHTML = `
+                    <td><strong>${rank}</strong></td>
+                    <td>${item.name}</td>
+                    <td>${dept}</td>
+                    <td style="font-weight:700; color:var(--accent-gold-light);">${item.score}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; opacity:0.6; padding:1rem;">Could not load leaderboard.</td></tr>';
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 12. Boot
     // ------------------------------------------------------------------
     initFloatingLetters();
     restoreSession();
+    renderLeaderboard();
 });
