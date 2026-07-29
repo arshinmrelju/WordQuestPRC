@@ -102,11 +102,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statTotalPlayers) statTotalPlayers.textContent = totalReg;
         if (badgePlayersCount) badgePlayersCount.textContent = totalReg;
 
-        // Leaderboard Count
-        const totalScores = leaderboardList.length;
-        if (badgeLeaderboardCount) badgeLeaderboardCount.textContent = totalScores;
+        // Leaderboard Count — deduplicated unique players (same key as renderLeaderboardTable)
+        const uniquePlayers = {};
+        leaderboardList.forEach(r => {
+            const key = `${r.rollNumber || ''}|${r.department || ''}|${r.year || ''}`;
+            if (!uniquePlayers[key] || (r.score || 0) > (uniquePlayers[key].score || 0)) {
+                uniquePlayers[key] = r;
+            }
+        });
+        const uniquePlayerCount = Object.keys(uniquePlayers).length;
+        if (badgeLeaderboardCount) badgeLeaderboardCount.textContent = uniquePlayerCount;
 
-        if (totalScores === 0) {
+        // Use deduplicated best scores for all stat calculations
+        const dedupedScores = Object.values(uniquePlayers);
+        if (dedupedScores.length === 0) {
             if (statTopScore) statTopScore.textContent = '0';
             if (statTopDept) statTopDept.textContent = 'None';
             if (statAvgScore) statAvgScore.textContent = '0';
@@ -114,17 +123,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Top Score
-        const topScore = Math.max(...leaderboardList.map(r => r.score || 0));
+        const topScore = Math.max(...dedupedScores.map(r => r.score || 0));
         if (statTopScore) statTopScore.textContent = topScore;
 
-        // Average Score
-        const sumScore = leaderboardList.reduce((acc, r) => acc + (r.score || 0), 0);
-        const avgScore = Math.round(sumScore / totalScores);
+        // Average Score (based on each player's best score only)
+        const sumScore = dedupedScores.reduce((acc, r) => acc + (r.score || 0), 0);
+        const avgScore = Math.round(sumScore / dedupedScores.length);
         if (statAvgScore) statAvgScore.textContent = avgScore;
 
-        // Top Department (Highest total cumulative score)
+        // Top Department (highest cumulative best-score per department)
         const deptScores = {};
-        leaderboardList.forEach(r => {
+        dedupedScores.forEach(r => {
             if (!r.department) return;
             const shortDept = r.department.replace('Department of ', '');
             deptScores[shortDept] = (deptScores[shortDept] || 0) + (r.score || 0);
@@ -224,7 +233,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedDept = deptFilter ? deptFilter.value : 'ALL';
         const selectedYear = yearFilter ? yearFilter.value : 'ALL';
 
-        const filtered = leaderboardList.filter(record => {
+        // ── Deduplicate: keep only each player's best (highest) score ──────
+        // Key = rollNumber + department + year to uniquely identify a player
+        const bestByPlayer = {};
+        leaderboardList.forEach(record => {
+            const key = `${record.rollNumber || ''}|${record.department || ''}|${record.year || ''}`;
+            if (!bestByPlayer[key] || (record.score || 0) > (bestByPlayer[key].score || 0)) {
+                bestByPlayer[key] = record;
+            }
+        });
+        // Convert map back to array, sorted by score descending
+        const deduped = Object.values(bestByPlayer).sort((a, b) => (b.score || 0) - (a.score || 0));
+
+        const filtered = deduped.filter(record => {
             const nameMatch = !searchVal || 
                 (record.name || '').toLowerCase().includes(searchVal) ||
                 (record.rollNumber || '').toLowerCase().includes(searchVal);
