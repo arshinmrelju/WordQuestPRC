@@ -9,10 +9,38 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Default initial word bank if none saved
     const DEFAULT_WORD_BANK = [
-        'QUEST', 'WORD', 'SPELL', 'CLUE', 'GRID',
-        'FIND', 'HUNT', 'LETTER', 'BRAIN', 'THINK',
-        'PLAY', 'SCORE', 'TIMER', 'PUZZLE', 'SEARCH',
-        'HINT', 'SOLVE', 'LEARN', 'FOCUS', 'SWIFT'
+        'ALLEGORY', 'ALLITERATION', 'ALLUSION', 'ANAPHORA', 'ANTAGONIST',
+        'ASSONANCE', 'BALLAD', 'BIOGRAPHY', 'CATHARSIS', 'CHARACTER',
+        'CLIMAX', 'COMEDY', 'CONFLICT', 'CONNOTATION', 'COUPLET',
+        'DENOTATION', 'DIALOGUE', 'DICTION', 'DRAMA', 'ELEGY',
+        'EPILOGUE', 'EUPHEMISM', 'EXPOSITION', 'FANTASY', 'FICTION',
+        'FLASHBACK', 'FORESHADOWING', 'GENRE', 'HYPERBOLE', 'IMAGERY',
+        'IRONY', 'METAPHOR', 'MONOLOGUE', 'MOTIF', 'NARRATOR',
+        'NOVEL', 'ODE', 'OXYMORON', 'PARADOX', 'PERSONIFICATION',
+        'PLOT', 'POETRY', 'PROLOGUE', 'PROTAGONIST', 'PUN',
+        'SATIRE', 'SIMILE', 'SOLILOQUY', 'SONNET', 'STANZA',
+        'SYMBOLISM', 'THEME', 'TONE', 'TRAGEDY', 'VERSE',
+        'SHAKESPEARE', 'CHAUCER', 'DICKENS', 'AUSTEN', 'ORWELL',
+        'TOLKIEN', 'SHELLEY', 'BYRON', 'KEATS', 'WORDSWORTH',
+        'ELIOT', 'WOOLF', 'HEMINGWAY', 'POE', 'FROST',
+        'MILTON', 'WILDE', 'JOYCE', 'KIPLING', 'PLATH',
+        'HAMLET', 'MACBETH', 'OTHELLO', 'TEMPEST', 'ODYSSEY',
+        'ILIAD', 'BEOWULF', 'ULYSSES', 'DRACULA', 'FRANKENSTEIN',
+        'EMMA', 'PERSUASION', 'DORIANGRAY', 'ANIMALFARM', 'NINETEENEIGHTYFOUR',
+        'PARADISELOST', 'CANTERBURY', 'KINGLEAR',
+        'ADJECTIVE', 'ADVERB', 'CLAUSE', 'CONJUNCTION', 'GERUND',
+        'HOMOPHONE', 'IDIOM', 'INTERJECTION', 'NOUN', 'PRONOUN',
+        'PREFIX', 'SUFFIX', 'PREPOSITION', 'PREDICATE', 'SUBJECT',
+        'TENSE', 'VERB', 'VOCABULARY', 'SYNTAX', 'SEMANTICS',
+        'PHONETICS', 'MORPHOLOGY',
+        'HAIKU', 'LIMERICK', 'BLANKVERSE', 'FREEVERSE', 'RHYTHM',
+        'RHYME', 'METER', 'REFRAIN', 'CHORUS', 'LYRIC', 'EPIC',
+        'STAGE', 'SCRIPT', 'SCENE', 'ACT', 'CURTAIN',
+        'AUDIENCE', 'PLAYWRIGHT', 'CAST', 'COSTUME',
+        'BILDUNGSROMAN', 'ONOMATOPOEIA', 'ANTHROPOMORPHISM', 'STREAMOFCONSCIOUSNESS',
+        'DECONSTRUCTION', 'EXISTENTIALISM', 'POSTMODERNISM', 'ROMANTICISM',
+        'TRANSCENDENTALISM', 'METAFICTION', 'JUXTAPOSITION', 'PATHETICFALLACY',
+        'SYNECDOCHE'
     ];
 
     // LocalStorage Keys
@@ -52,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let leaderboardList = []; // Game scores from Firestore 'leaderboard'
     let customWordsList = [];
     let currentTab      = 'players'; // 'players' | 'leaderboard'
+    let firebaseReady   = false;    // true once Firestore has responded at least once
 
     // ----------------------------------------------------------------------
     // 1. Tab Switching
@@ -79,13 +108,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // ----------------------------------------------------------------------
     // 2. Load Local Data Backup
     // ----------------------------------------------------------------------
-    function loadData() {
-        try {
-            leaderboardList = JSON.parse(localStorage.getItem(STORAGE_KEY_LEADERBOARD) || '[]');
-        } catch (e) {
-            leaderboardList = [];
-        }
+    let leaderboardCache = []; // localStorage fallback cached separately
 
+    function loadData() {
+        leaderboardList = [];
+        try {
+            leaderboardCache = JSON.parse(localStorage.getItem(STORAGE_KEY_LEADERBOARD) || '[]');
+        } catch (e) {
+            leaderboardCache = [];
+        }
         try {
             customWordsList = JSON.parse(localStorage.getItem(STORAGE_KEY_CUSTOM_WORDS) || JSON.stringify(DEFAULT_WORD_BANK));
         } catch (e) {
@@ -97,8 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Compute Dashboard Statistics
     // ----------------------------------------------------------------------
     function updateStats() {
-        // Total Registered Participants Count
-        const totalReg = playersList.length;
+        // Total Registered Participants Count (deduplicated)
+        const totalReg = deduplicatePlayers(playersList).length;
         if (statTotalPlayers) statTotalPlayers.textContent = totalReg;
         if (badgePlayersCount) badgePlayersCount.textContent = totalReg;
 
@@ -161,7 +192,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedDept = deptFilter ? deptFilter.value : 'ALL';
         const selectedYear = yearFilter ? yearFilter.value : 'ALL';
 
-        const filtered = playersList.filter(item => {
+        const deduped = deduplicatePlayers(playersList);
+
+        const filtered = deduped.filter(item => {
             const nameMatch = !searchVal || 
                 (item.name || '').toLowerCase().includes(searchVal) ||
                 (item.rollNumber || '').toLowerCase().includes(searchVal);
@@ -207,17 +240,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Event Handlers for delete player
         playersTableBody.querySelectorAll('.delete-row-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 const id = btn.getAttribute('data-id');
                 const name = btn.getAttribute('data-name');
-                if (confirm(`Are you sure you want to delete registration for "${name}"?`)) {
-                    if (window.WordQuestFirebase && window.WordQuestFirebase.deletePlayerFromFirestore) {
-                        window.WordQuestFirebase.deletePlayerFromFirestore(id);
-                    }
+                if (!confirm(`Are you sure you want to delete registration for "${name}"?`)) return;
+                btn.disabled = true;
+                btn.innerHTML = '<span style="opacity:0.5">Deleting...</span>';
+                const deleted = window.WordQuestFirebase && window.WordQuestFirebase.deletePlayerFromFirestore
+                    ? await window.WordQuestFirebase.deletePlayerFromFirestore(id).catch(() => false)
+                    : false;
+                if (deleted !== false) {
                     playersList = playersList.filter(p => p.id !== id);
-                    updateStats();
-                    renderPlayersTable();
                 }
+                updateStats();
+                renderPlayersTable();
             });
         });
     }
@@ -258,6 +294,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             return nameMatch && deptMatch && yearMatch;
         });
+
+        if (!firebaseReady) {
+            leaderboardTableBody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                        Loading leaderboard from server...
+                    </td>
+                </tr>
+            `;
+            return;
+        }
 
         if (filtered.length === 0) {
             leaderboardTableBody.innerHTML = `
@@ -304,18 +351,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Event Handlers for delete score
         leaderboardTableBody.querySelectorAll('.delete-row-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 const id = btn.getAttribute('data-id');
                 const name = btn.getAttribute('data-name');
-                if (confirm(`Are you sure you want to delete score entry for "${name}"?`)) {
-                    if (window.WordQuestFirebase && window.WordQuestFirebase.deleteScoreFromFirestore) {
-                        window.WordQuestFirebase.deleteScoreFromFirestore(id);
-                    }
+                if (!confirm(`Are you sure you want to delete score entry for "${name}"?`)) return;
+                btn.disabled = true;
+                btn.innerHTML = '<span style="opacity:0.5">Deleting...</span>';
+                const deleted = window.WordQuestFirebase && window.WordQuestFirebase.deleteScoreFromFirestore
+                    ? await window.WordQuestFirebase.deleteScoreFromFirestore(id).catch(() => false)
+                    : false;
+                if (deleted !== false) {
                     leaderboardList = leaderboardList.filter(r => r.id !== id);
                     saveLeaderboard();
-                    updateStats();
-                    renderLeaderboardTable();
                 }
+                updateStats();
+                renderLeaderboardTable();
             });
         });
     }
@@ -475,6 +525,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (deptFilter)  deptFilter.addEventListener('change', renderCurrentTab);
     if (yearFilter)  yearFilter.addEventListener('change', renderCurrentTab);
 
+    // Deduplicate players list by rollNumber + department + year
+    function deduplicatePlayers(players) {
+        const seen = {};
+        return players.filter(p => {
+            const key = `${p.rollNumber || ''}|${p.department || ''}|${p.year || ''}`;
+            if (seen[key]) return false;
+            seen[key] = true;
+            return true;
+        });
+    }
+
     // Escape HTML Helper
     function escapeHtml(str) {
         return String(str)
@@ -495,24 +556,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.WordQuestFirebase.subscribeToPlayers) {
             window.WordQuestFirebase.subscribeToPlayers((list) => {
                 if (Array.isArray(list)) {
-                    playersList = list;
+                    playersList = deduplicatePlayers(list);
                     updateStats();
                     if (currentTab === 'players') renderPlayersTable();
                 }
             });
         }
 
-        // 2. Subscribe to Live Leaderboard Scores
+        // 2. Subscribe to Live Leaderboard Scores (real-time from Firestore)
         if (window.WordQuestFirebase.subscribeToLeaderboard) {
             window.WordQuestFirebase.subscribeToLeaderboard((list) => {
                 if (Array.isArray(list)) {
                     leaderboardList = list;
                     saveLeaderboard();
+                    firebaseReady = true;
                     updateStats();
-                    if (currentTab === 'leaderboard') renderLeaderboardTable();
+                    renderLeaderboardTable();
                 }
             });
         }
+
+        // Fallback: if Firebase doesn't respond within 6s, show cached localStorage data
+        setTimeout(() => {
+            if (!firebaseReady && leaderboardCache.length > 0) {
+                leaderboardList = leaderboardCache;
+                firebaseReady = true;
+                updateStats();
+                renderLeaderboardTable();
+            }
+        }, 6000);
 
         // 3. Fetch Word Bank
         if (window.WordQuestFirebase.getWordBankFromFirestore) {

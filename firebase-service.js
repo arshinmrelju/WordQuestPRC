@@ -87,12 +87,14 @@ export function subscribeToLeaderboard(callback) {
  * @param {String} docId Document ID to delete
  */
 export async function deleteScoreFromFirestore(docId) {
-    if (!docId) return;
+    if (!docId) return false;
     try {
         await deleteDoc(doc(db, "leaderboard", docId));
         console.log("Document deleted from Firestore:", docId);
+        return true;
     } catch (e) {
         console.warn("Firestore delete document error:", e);
+        return false;
     }
 }
 
@@ -154,6 +156,33 @@ export async function getWordBankFromFirestore() {
  * @param {{ name, department, year, rollNumber }} playerData
  */
 export async function registerPlayer(playerData) {
+    const { rollNumber, department, year } = playerData;
+    if (rollNumber && department && year) {
+        // Check if already registered (catches existing auto-ID docs)
+        const existing = await getPlayerByRollNumber(rollNumber, department, year);
+        if (existing) {
+            console.log("Player already registered with ID:", existing.id);
+            return existing.id;
+        }
+        // Use a composite document ID so Firestore itself prevents duplicates
+        const docId = `${rollNumber}|${department}|${year}`;
+        const docRef = doc(db, "players", docId);
+        try {
+            await setDoc(docRef, {
+                name:        playerData.name || "Player",
+                department,
+                year,
+                rollNumber,
+                registeredAt: serverTimestamp()
+            });
+            console.log("Player registered with ID:", docId);
+            return docId;
+        } catch (e) {
+            console.warn("Firestore registerPlayer error:", e);
+            return null;
+        }
+    }
+    // Missing identifying fields — fallback to auto-generated ID
     try {
         const docRef = await addDoc(collection(db, "players"), {
             name:        playerData.name       || "Player",
@@ -165,7 +194,7 @@ export async function registerPlayer(playerData) {
         console.log("Player registered with ID:", docRef.id);
         return docRef.id;
     } catch (e) {
-        console.warn("Firestore registerPlayer error:", e);
+        console.warn("Firestore registerPlayer fallback error:", e);
         return null;
     }
 }
@@ -280,12 +309,14 @@ export function subscribeToPlayers(callback) {
  * @param {String} docId Document ID to delete
  */
 export async function deletePlayerFromFirestore(docId) {
-    if (!docId) return;
+    if (!docId) return false;
     try {
         await deleteDoc(doc(db, "players", docId));
         console.log("Player document deleted from Firestore:", docId);
+        return true;
     } catch (e) {
         console.warn("Firestore delete player error:", e);
+        return false;
     }
 }
 
