@@ -663,25 +663,20 @@ class WordSearch {
 
     /* ── SCORE PERSISTENCE ────────────────────── */
     _saveScore() {
-        // Read player profile from localStorage (set by script.js on index.html)
         const name       = localStorage.getItem('wordQuest_playerName')       || 'Player';
         const rollNumber = localStorage.getItem('wordQuest_rollNumber')       || '';
         const department = localStorage.getItem('wordQuest_department')        || '';
         const year       = localStorage.getItem('wordQuest_yearOfStudy')       || '';
 
-        // Accumulate cumulative score
         this.cumulativeScore += this.score;
         this._saveCumulativeScore();
 
         const today = new Date().toLocaleDateString();
         const record = {
-            name,
-            rollNumber,
-            department,
-            year,
+            name, rollNumber, department, year,
             score: this.score,
             cumulativeScore: this.cumulativeScore,
-            date:  today
+            date: today
         };
 
         // 1. Save to localStorage leaderboard
@@ -701,20 +696,51 @@ class WordSearch {
             localStorage.setItem(histKey, JSON.stringify(history));
         } catch { /* noop */ }
 
-        // 3. Save to Firestore (if Firebase module has loaded)
-        if (window.WordQuestFirebase && window.WordQuestFirebase.saveScoreToFirestore) {
-            window.WordQuestFirebase.saveScoreToFirestore(record).catch(() => {
-                console.warn('Firestore score save failed — score is in localStorage.');
-            });
-        }
+        // 3. Save to Firestore with retry
+        this._saveToFirestore(record, 5);
 
         // 4. Save cumulative score to Firestore
-        if (window.WordQuestFirebase && window.WordQuestFirebase.saveCumulativeScoreToFirestore) {
-            window.WordQuestFirebase.saveCumulativeScoreToFirestore({
-                name, rollNumber, department, year,
-                cumulativeScore: this.cumulativeScore
-            });
+        this._saveCumulativeToFirestore({ name, rollNumber, department, year, cumulativeScore: this.cumulativeScore }, 5);
+    }
+
+    _saveToFirestore(record, attempts) {
+        if (!window.WordQuestFirebase || !window.WordQuestFirebase.saveScoreToFirestore) {
+            if (attempts > 0) {
+                setTimeout(() => this._saveToFirestore(record, attempts - 1), 2000);
+            } else {
+                console.warn('Firestore not available — score saved to localStorage only.');
+            }
+            return;
         }
+        window.WordQuestFirebase.saveScoreToFirestore(record).then((docId) => {
+            if (docId) {
+                console.log('Score saved to Firestore:', docId);
+            } else if (attempts > 0) {
+                setTimeout(() => this._saveToFirestore(record, attempts - 1), 2000);
+            } else {
+                console.warn('Firestore score save failed after retries.');
+            }
+        }).catch(() => {
+            if (attempts > 0) {
+                setTimeout(() => this._saveToFirestore(record, attempts - 1), 2000);
+            }
+        });
+    }
+
+    _saveCumulativeToFirestore(data, attempts) {
+        if (!window.WordQuestFirebase || !window.WordQuestFirebase.saveCumulativeScoreToFirestore) {
+            if (attempts > 0) {
+                setTimeout(() => this._saveCumulativeToFirestore(data, attempts - 1), 2000);
+            } else {
+                console.warn('Firestore not available — cumulative score saved to localStorage only.');
+            }
+            return;
+        }
+        window.WordQuestFirebase.saveCumulativeScoreToFirestore(data).catch(() => {
+            if (attempts > 0) {
+                setTimeout(() => this._saveCumulativeToFirestore(data, attempts - 1), 2000);
+            }
+        });
     }
 
     /* ── HELPERS ──────────────────────────────── */
