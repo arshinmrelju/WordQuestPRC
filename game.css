@@ -43,7 +43,7 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.35rem 0.75rem;
-    background: rgba(255,255,255,0.04);
+    background: rgba(15,23,42,0.05);
     border: 1px solid var(--card-border);
     border-radius: var(--radius-full);
     flex-shrink: 0;
@@ -98,12 +98,12 @@
     font-family: var(--font-title);
     font-size: 0.85rem;
     font-weight: 800;
-    color: var(--text-primary);
+    color: #ffffff;
     line-height: 1;
 }
 
 .logo-letter.logo-letter-accent {
-    color: var(--accent-gold-light);
+    color: #f59e0b;
 }
 
 .game-header-title {
@@ -137,7 +137,7 @@
     flex-direction: column;
     align-items: center;
     padding: 0.35rem 0.85rem;
-    background: rgba(255,255,255,0.04);
+    background: rgba(15,23,42,0.05);
     border: 1px solid var(--card-border);
     border-radius: var(--radius-full);
     min-width: 64px;
@@ -154,7 +154,7 @@
     background: rgba(168,85,247,0.06);
 }
 .stat-capsule-purple .stat-capsule-val {
-    color: #c084fc;
+    color: #7c3aed;
 }
 
 .stat-capsule-timer { transition: var(--transition-fast); }
@@ -196,7 +196,7 @@
 /* ── TIMER RAIL ──────────────────────────────── */
 .timer-rail {
     height: 4px;
-    background: rgba(255,255,255,0.04);
+    background: rgba(15,23,42,0.05);
     border-radius: var(--radius-full);
     overflow: hidden;
 }
@@ -256,7 +256,7 @@
     padding: 0.45rem 0.85rem;
     border-radius: var(--radius-md);
     border: 1px solid var(--card-border);
-    background: rgba(255,255,255,0.025);
+    background: rgba(15,23,42,0.04);
     transition: var(--transition-fast);
     cursor: default;
     display: flex;
@@ -276,7 +276,7 @@
 }
 
 .word-list li.found-word {
-    color: #4ade80;
+    color: #16a34a;
     border-color: rgba(74,222,128,0.3);
     background: rgba(74,222,128,0.06);
     text-decoration: line-through;
@@ -284,7 +284,7 @@
 }
 
 .word-list li.found-word::before {
-    background: #4ade80;
+    background: #16a34a;
     box-shadow: 0 0 6px rgba(74,222,128,0.6);
 }
 
@@ -307,7 +307,7 @@
     margin-left: auto;
     font-size: 0.72rem;
     color: var(--text-muted);
-    background: rgba(255,255,255,0.04);
+    background: rgba(15,23,42,0.05);
     border: 1px solid var(--card-border);
     padding: 0.22rem 0.7rem;
     border-radius: var(--radius-full);
@@ -345,7 +345,7 @@
     letter-spacing: 0.2px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--card-border);
-    background: rgba(15,23,42,0.6);
+    background: rgba(255,255,255,0.85);
     color: var(--text-secondary);
     cursor: pointer;
     text-transform: uppercase;
@@ -369,7 +369,7 @@
     background: rgba(217,119,6,0.2);
     border-color: var(--accent-gold);
     color: #ffffff;
-    box-shadow: 0 0 8px var(--accent-gold-glow), inset 0 1px 0 rgba(255,255,255,0.12);
+    box-shadow: 0 0 8px var(--accent-gold-glow), inset 0 1px 0 rgba(15,23,42,0.12);
     transform: scale(1.08);
     z-index: 2;
 }
@@ -378,7 +378,7 @@
 .cell.found {
     background: rgba(34,197,94,0.12);
     border-color: rgba(34,197,94,0.4);
-    color: #4ade80;
+    color: #16a34a;
     box-shadow: 0 0 8px rgba(34,197,94,0.25);
     animation: cellPop 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards;
 }
@@ -393,7 +393,7 @@
 .cell.revealed {
     background: rgba(245, 158, 11, 0.22) !important;
     border-color: rgba(245, 158, 11, 0.75) !important;
-    color: #fbbf24 !important;
+    color: #d97706 !important;
     box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
     animation: revealedPulse 1.6s ease-in-out infinite alternate;
 }
@@ -404,13 +404,13 @@
 }
 
 .word-list li.revealed-word {
-    color: #fbbf24;
+    color: #d97706;
     border-color: rgba(245, 158, 11, 0.45);
     background: rgba(245, 158, 11, 0.1);
 }
 
 .word-list li.revealed-word::before {
-    background: #fbbf24;
+    background: #d97706;
     box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
 }
 
@@ -426,7 +426,7 @@
     gap: 0.5rem;
     padding: 0.75rem;
     border-radius: var(--radius-full);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(217, 119, 6, 0.4);
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.2), 0 0 15px rgba(217, 119, 6, 0.35);
     animation: fabEntrance 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
     min-width: 48px;
     min-height: 48px;
@@ -454,7 +454,7 @@
 .overlay-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(7,11,20,0.88);
+    background: rgba(15,23,42,0.45);
     backdrop-filter: blur(14px);
     display: flex;
     align-items: center;
@@ -520,7 +520,7 @@
     align-items: center;
     gap: 0.2rem;
     padding: 0.9rem 2rem;
-    background: rgba(255,255,255,0.03);
+    background: rgba(15,23,42,0.04);
     border: 1px solid var(--card-border-gold);
     border-radius: var(--radius-md);
     width: 100%;
@@ -547,10 +547,10 @@
 }
 .score-showcase-sm .score-showcase-num {
     font-size: 1.5rem;
-    color: #c084fc;
+    color: #7c3aed;
 }
 .score-showcase-sm .score-showcase-label {
-    color: rgba(192,132,252,0.7);
+    color: rgba(124,58,237,0.7);
 }
 
 .btn-group {
@@ -637,7 +637,7 @@
     align-items: center;
     gap: 1rem;
     padding: 0.45rem 0.75rem;
-    background: rgba(255,255,255,0.025);
+    background: rgba(15,23,42,0.04);
     border: 1px solid var(--card-border);
     border-radius: var(--radius-sm);
     font-size: 0.82rem;
