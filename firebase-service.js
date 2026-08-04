@@ -43,33 +43,29 @@ const db = getFirestore(app);
 export async function saveScoreToFirestore(scoreData) {
     try {
         const { rollNumber, department, year, id } = scoreData;
-        let docId = id;
-        if (!docId) {
-            if (rollNumber && department && year) {
-                docId = `${rollNumber}|${department}|${year}`;
-            } else if (rollNumber) {
-                docId = rollNumber;
-            }
+        let docId = `${rollNumber}|${department}|${year}`;
+        if (!rollNumber || !department || !year) {
+            docId = id || rollNumber || 'anonymous';
         }
 
-        if (docId) {
-            const docRef = doc(db, "leaderboard", docId);
-            await setDoc(docRef, {
-                name: scoreData.name || "Player",
-                rollNumber: scoreData.rollNumber || "",
-                department: scoreData.department || "",
-                year: scoreData.year || "",
-                difficulty: scoreData.difficulty || "medium",
-                score: scoreData.score || 0,
-                cumulativeScore: scoreData.cumulativeScore || 0,
-                timestamp: serverTimestamp(),
-                date: new Date().toLocaleDateString()
-            }, { merge: true });
-            console.log("Score saved to Firestore leaderboard with ID:", docId);
-            return docId;
+        // Clean up any legacy auto-generated ID leaderboard docs for this player
+        if (rollNumber) {
+            try {
+                const legacyQuery = query(
+                    collection(db, "leaderboard"),
+                    where("rollNumber", "==", rollNumber)
+                );
+                const legacySnap = await getDocs(legacyQuery);
+                legacySnap.forEach(async (dSnap) => {
+                    if (dSnap.id !== docId) {
+                        await deleteDoc(doc(db, "leaderboard", dSnap.id)).catch(() => {});
+                    }
+                });
+            } catch (e) { /* noop */ }
         }
 
-        const docRef = await addDoc(collection(db, "leaderboard"), {
+        const docRef = doc(db, "leaderboard", docId);
+        await setDoc(docRef, {
             name: scoreData.name || "Player",
             rollNumber: scoreData.rollNumber || "",
             department: scoreData.department || "",
@@ -79,11 +75,11 @@ export async function saveScoreToFirestore(scoreData) {
             cumulativeScore: scoreData.cumulativeScore || 0,
             timestamp: serverTimestamp(),
             date: new Date().toLocaleDateString()
-        });
-        console.log("Score saved to Firestore leaderboard with auto ID:", docRef.id);
-        return docRef.id;
+        }, { merge: true });
+        console.log("Score saved to Firestore leaderboard with ID:", docId);
+        return docId;
     } catch (e) {
-        console.warn("Firestore save score error (falling back to LocalStorage):", e);
+        console.warn("Firestore save score error:", e);
         return null;
     }
 }
@@ -120,16 +116,27 @@ export async function deleteScoreFromFirestore(target) {
 export async function saveCumulativeScoreToFirestore(data) {
     try {
         const { rollNumber, department, year, id } = data;
-        let docId = id;
-        if (!docId) {
-            if (rollNumber && department && year) {
-                docId = `${rollNumber}|${department}|${year}`;
-            } else if (rollNumber) {
-                docId = rollNumber;
-            } else {
-                docId = 'anonymous';
-            }
+        let docId = `${rollNumber}|${department}|${year}`;
+        if (!rollNumber || !department || !year) {
+            docId = id || rollNumber || 'anonymous';
         }
+
+        // Purge any legacy auto-generated ID docs in cumulativeScores for this roll number
+        if (rollNumber) {
+            try {
+                const legacyQuery = query(
+                    collection(db, "cumulativeScores"),
+                    where("rollNumber", "==", rollNumber)
+                );
+                const legacySnap = await getDocs(legacyQuery);
+                legacySnap.forEach(async (dSnap) => {
+                    if (dSnap.id !== docId) {
+                        await deleteDoc(doc(db, "cumulativeScores", dSnap.id)).catch(() => {});
+                    }
+                });
+            } catch (e) { /* noop */ }
+        }
+
         const docRef = doc(db, "cumulativeScores", docId);
         await setDoc(docRef, {
             name: data.name || "Player",
@@ -183,46 +190,41 @@ export async function getWordBankFromFirestore() {
  */
 export async function registerPlayer(playerData) {
     const { rollNumber, department, year } = playerData;
-    if (rollNumber && department && year) {
-        // Check if already registered (catches existing auto-ID docs)
-        const existing = await getPlayerByRollNumber(rollNumber, department, year);
-        if (existing) {
-            console.log("Player already registered with ID:", existing.id);
-            return existing.id;
-        }
-        // Use a composite document ID so Firestore itself prevents duplicates
-        const docId = `${rollNumber}|${department}|${year}`;
-        const docRef = doc(db, "players", docId);
-        try {
-            await setDoc(docRef, {
-                name:        playerData.name || "Player",
-                phoneNumber: playerData.phoneNumber || "",
-                department,
-                year,
-                rollNumber,
-                registeredAt: serverTimestamp()
-            }, { merge: true });
-            console.log("Player registered with ID:", docId);
-            return docId;
-        } catch (e) {
-            console.warn("Firestore registerPlayer error:", e);
-            return null;
-        }
+    let docId = `${rollNumber}|${department}|${year}`;
+    if (!rollNumber || !department || !year) {
+        docId = playerData.id || rollNumber || 'anonymous';
     }
-    // Missing identifying fields — fallback to auto-generated ID
+
+    // Purge any legacy auto-generated ID player docs for this roll number
+    if (rollNumber) {
+        try {
+            const legacyQuery = query(
+                collection(db, "players"),
+                where("rollNumber", "==", rollNumber)
+            );
+            const legacySnap = await getDocs(legacyQuery);
+            legacySnap.forEach(async (dSnap) => {
+                if (dSnap.id !== docId) {
+                    await deleteDoc(doc(db, "players", dSnap.id)).catch(() => {});
+                }
+            });
+        } catch (e) { /* noop */ }
+    }
+
+    const docRef = doc(db, "players", docId);
     try {
-        const docRef = await addDoc(collection(db, "players"), {
+        await setDoc(docRef, {
             name:        playerData.name        || "Player",
             phoneNumber: playerData.phoneNumber || "",
-            department:  playerData.department  || "",
-            year:        playerData.year        || "",
-            rollNumber:  playerData.rollNumber  || "",
+            department:  department             || "",
+            year:        year                   || "",
+            rollNumber:  rollNumber             || "",
             registeredAt: serverTimestamp()
-        });
-        console.log("Player registered with ID:", docRef.id);
-        return docRef.id;
+        }, { merge: true });
+        console.log("Player registered with ID:", docId);
+        return docId;
     } catch (e) {
-        console.warn("Firestore registerPlayer fallback error:", e);
+        console.warn("Firestore registerPlayer error:", e);
         return null;
     }
 }
