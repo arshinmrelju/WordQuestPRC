@@ -137,7 +137,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const uniquePlayers = {};
         leaderboardList.forEach(r => {
             const key = `${r.rollNumber || ''}|${r.department || ''}|${r.year || ''}`;
-            if (!uniquePlayers[key] || (r.score || 0) > (uniquePlayers[key].score || 0)) {
+            const currTotal = Math.max(r.cumulativeScore || 0, r.score || 0);
+            const existTotal = uniquePlayers[key] ? Math.max(uniquePlayers[key].cumulativeScore || 0, uniquePlayers[key].score || 0) : -1;
+            if (!uniquePlayers[key] || currTotal > existTotal) {
                 uniquePlayers[key] = r;
             }
         });
@@ -153,12 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Top Score
-        const topScore = Math.max(...dedupedScores.map(r => r.score || 0));
+        // Top Score — use cumulativeScore (true total), fallback to score
+        const topScore = Math.max(...dedupedScores.map(r => Math.max(r.cumulativeScore || 0, r.score || 0)));
         if (statTopScore) statTopScore.textContent = topScore;
 
-        // Average Score (based on each player's best score only)
-        const sumScore = dedupedScores.reduce((acc, r) => acc + (r.score || 0), 0);
+        // Average Score (based on each player's cumulative total)
+        const sumScore = dedupedScores.reduce((acc, r) => acc + Math.max(r.cumulativeScore || 0, r.score || 0), 0);
         const avgScore = Math.round(sumScore / dedupedScores.length);
         if (statAvgScore) statAvgScore.textContent = avgScore;
 
@@ -167,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dedupedScores.forEach(r => {
             if (!r.department) return;
             const shortDept = r.department.replace('Department of ', '');
-            deptScores[shortDept] = (deptScores[shortDept] || 0) + (r.score || 0);
+            deptScores[shortDept] = (deptScores[shortDept] || 0) + Math.max(r.cumulativeScore || 0, r.score || 0);
         });
 
         let topDeptName = 'None';
@@ -289,8 +291,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 bestByPlayer[key] = record;
             }
         });
-        // Convert map back to array, sorted by score descending
-        const deduped = Object.values(bestByPlayer).sort((a, b) => (b.score || 0) - (a.score || 0));
+        // Convert map back to array, sorted by cumulativeScore / total score descending
+        const deduped = Object.values(bestByPlayer).sort((a, b) => {
+            const totalA = Math.max(a.cumulativeScore || 0, a.score || 0);
+            const totalB = Math.max(b.cumulativeScore || 0, b.score || 0);
+            if (totalB !== totalA) return totalB - totalA;
+            return (b.score || 0) - (a.score || 0);
+        });
 
         const filtered = deduped.filter(record => {
             const nameMatch = !searchVal || 

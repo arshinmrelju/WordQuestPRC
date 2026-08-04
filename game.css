@@ -686,6 +686,59 @@
 
 .footer strong { color: var(--text-secondary); }
 
+.footer-built-by {
+    margin-top: 0.4rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    opacity: 0.75;
+}
+
+.footer-brand-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    transition: color 0.2s ease, opacity 0.2s ease;
+    vertical-align: middle;
+}
+
+.footer-brand-link:hover {
+    color: var(--accent-gold-light);
+    opacity: 1;
+}
+
+.footer-brand-logo {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    min-width: 12px;
+    min-height: 12px;
+    max-width: 12px;
+    max-height: 12px;
+    border-radius: 2px;
+    vertical-align: middle;
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.footer-brand-link:hover .footer-brand-logo { opacity: 1; }
+
+.footer-built-by strong {
+    font-family: var(--font-body);
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+}
+
 /* ── ANIMATIONS SHARED WITH index.html ─────────── */
 .animate-fade-in {
     animation: fadeInUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards;

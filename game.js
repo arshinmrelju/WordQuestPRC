@@ -187,6 +187,15 @@ class WordSearch {
 
     /* ── BOOT ─────────────────────────────────── */
     init() {
+        // Reset per-game state
+        this.grid       = [];
+        this.placed     = {};
+        this.foundWords = new Set();
+        this.score      = 0;
+        this.selecting  = false;
+        this.selStart   = null;
+        this.selCells   = [];
+
         this._loadPlayerLevel();
         this._applyDifficulty();
         this._loadCumulativeScore();
@@ -489,6 +498,9 @@ class WordSearch {
 
     /* ── EVENT BINDING (mouse + touch) ───────── */
     _bindEvents() {
+        if (this.eventsBound) return;
+        this.eventsBound = true;
+
         const gridEl = document.getElementById('grid');
         if (!gridEl) return;
 
@@ -625,6 +637,7 @@ class WordSearch {
 
         this._updateHUD();
         this._toast(`✓ Found: ${word}`, 1400);
+        this._saveLiveProgress(); // ⚡ Instantly update Firestore leaderboard when a word is found!
 
         // All found?
         if (this.foundWords.size === this.words.length) {
@@ -730,17 +743,19 @@ class WordSearch {
         this.score += totalBonus;
         this._updateHUD();
         this._saveScore();
-        this._incrementPlayerLevel(); // ⚡ Advance level for next round
+        
+        const clearedLevel = this.level;
+        this._incrementPlayerLevel(); // ⚡ Advance level for next round (this.level is now next level)
 
         const emojiEl = document.getElementById('end-emoji');
         if (emojiEl) emojiEl.textContent = '🏆';
         
         const titleEl = document.getElementById('end-title');
-        if (titleEl) titleEl.textContent = `Level ${this.level} Cleared!`;
+        if (titleEl) titleEl.textContent = `Level ${clearedLevel} Cleared!`;
         
         const subEl = document.getElementById('end-sub');
         let bonusInfo = `+${totalBonus} speed bonus (${timeBonus}s time + ${speedTierBonus} speed tier)`;
-        let levelUpInfo = `🔥 Level Up! Next round will be Level ${this.level + 1} (Harder grid & more words!)`;
+        let levelUpInfo = `🔥 Level Up! Next round will be Level ${this.level} (Harder grid & more words!)`;
         if (tierName) {
             subEl.textContent = `${tierName}! All ${this.words.length} words found! ${bonusInfo}. ${levelUpInfo}`;
         } else {
@@ -766,6 +781,8 @@ class WordSearch {
     _timeUp() {
         this._unregisterActiveGame();
         this._saveScore();
+
+        const clearedLevel = this.level;
         this._incrementPlayerLevel(); // ⚡ Advance level for next round
 
         // 1. Reveal answers on grid immediately
@@ -778,12 +795,12 @@ class WordSearch {
             if (emojiEl) emojiEl.textContent = '⏰';
             
             const titleEl = document.getElementById('end-title');
-            if (titleEl) titleEl.textContent = `Level ${this.level} Time's Up!`;
+            if (titleEl) titleEl.textContent = `Level ${clearedLevel} Time's Up!`;
             
             const unfoundCount = this.words.length - this.foundWords.size;
             const subEl = document.getElementById('end-sub');
             if (subEl) {
-                subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) revealed!' : ''} 🔥 Next round will be Level ${this.level + 1}!`;
+                subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) revealed!' : ''} 🔥 Next round will be Level ${this.level}!`;
             }
             
             const numEl = document.getElementById('score-result-num');
@@ -857,6 +874,50 @@ class WordSearch {
     }
 
     /* ── SCORE PERSISTENCE ────────────────────── */
+    _saveLiveProgress() {
+        const name       = localStorage.getItem('wordQuest_playerName')       || 'Player';
+        const rollNumber = localStorage.getItem('wordQuest_rollNumber')       || '';
+        const department = localStorage.getItem('wordQuest_department')        || '';
+        const year       = localStorage.getItem('wordQuest_yearOfStudy')       || '';
+
+        const currentCumulative = this.cumulativeScore + this.score;
+        const today = new Date().toLocaleDateString();
+        const record = {
+            id: this._getPlayerKey(),
+            name, rollNumber, department, year,
+            score: this.score,
+            cumulativeScore: currentCumulative,
+            date: today
+        };
+
+        // Update local leaderboard cache
+        try {
+            const key  = 'wordQuest_leaderboard';
+            const list = JSON.parse(localStorage.getItem(key) || '[]');
+            const playerKey = this._getPlayerKey();
+            const idx = list.findIndex(r => (r.id === playerKey || (rollNumber && r.rollNumber === rollNumber)));
+            if (idx >= 0) {
+                list[idx] = { ...list[idx], ...record };
+            } else {
+                list.push(record);
+            }
+            list.sort((a, b) => b.score - a.score);
+            localStorage.setItem(key, JSON.stringify(list.slice(0, 100)));
+        } catch { /* noop */ }
+
+        // Live real-time update to Firestore leaderboard & cumulative collections
+        if (window.WordQuestFirebase && window.WordQuestFirebase.saveScoreToFirestore) {
+            window.WordQuestFirebase.saveScoreToFirestore(record).catch(() => {});
+        }
+        if (window.WordQuestFirebase && window.WordQuestFirebase.saveCumulativeScoreToFirestore) {
+            window.WordQuestFirebase.saveCumulativeScoreToFirestore({
+                id: this._getPlayerKey(),
+                name, rollNumber, department, year,
+                cumulativeScore: currentCumulative
+            }).catch(() => {});
+        }
+    }
+
     _saveScore() {
         const name       = localStorage.getItem('wordQuest_playerName')       || 'Player';
         const rollNumber = localStorage.getItem('wordQuest_rollNumber')       || '';
