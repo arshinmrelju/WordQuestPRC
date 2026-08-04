@@ -196,11 +196,12 @@ export async function registerPlayer(playerData) {
         try {
             await setDoc(docRef, {
                 name:        playerData.name || "Player",
+                phoneNumber: playerData.phoneNumber || "",
                 department,
                 year,
                 rollNumber,
                 registeredAt: serverTimestamp()
-            });
+            }, { merge: true });
             console.log("Player registered with ID:", docId);
             return docId;
         } catch (e) {
@@ -211,10 +212,11 @@ export async function registerPlayer(playerData) {
     // Missing identifying fields — fallback to auto-generated ID
     try {
         const docRef = await addDoc(collection(db, "players"), {
-            name:        playerData.name       || "Player",
-            department:  playerData.department || "",
-            year:        playerData.year       || "",
-            rollNumber:  playerData.rollNumber || "",
+            name:        playerData.name        || "Player",
+            phoneNumber: playerData.phoneNumber || "",
+            department:  playerData.department  || "",
+            year:        playerData.year        || "",
+            rollNumber:  playerData.rollNumber  || "",
             registeredAt: serverTimestamp()
         });
         console.log("Player registered with ID:", docRef.id);

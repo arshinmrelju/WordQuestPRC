@@ -15,10 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // New registration form
     const playerForm       = document.getElementById('player-form');
     const playerNameInput  = document.getElementById('player-name');
+    const playerPhoneInput = document.getElementById('player-phone');
     const rollNumberInput  = document.getElementById('roll-number');
     const departmentSelect = document.getElementById('department');
     const yearSelect       = document.getElementById('year-of-study');
     const nameError        = document.getElementById('name-error');
+    const phoneError       = document.getElementById('phone-error');
     const rollError        = document.getElementById('roll-error');
     const departmentError  = document.getElementById('department-error');
     const yearError        = document.getElementById('year-error');
@@ -47,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // LocalStorage Keys
     const KEY_NAME       = 'wordQuest_playerName';
+    const KEY_PHONE      = 'wordQuest_phoneNumber';
     const KEY_ROLL       = 'wordQuest_rollNumber';
     const KEY_DEPARTMENT = 'wordQuest_department';
     const KEY_YEAR       = 'wordQuest_yearOfStudy';
@@ -75,14 +78,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Restore session (pre-fill from localStorage)
     // ------------------------------------------------------------------
     function restoreSession() {
-        const name = localStorage.getItem(KEY_NAME);
-        const roll = localStorage.getItem(KEY_ROLL);
-        const dept = localStorage.getItem(KEY_DEPARTMENT);
-        const year = localStorage.getItem(KEY_YEAR);
-        if (name && playerNameInput)  playerNameInput.value  = name;
-        if (roll && rollNumberInput)  rollNumberInput.value  = roll;
-        if (dept && departmentSelect) departmentSelect.value = dept;
-        if (year && yearSelect)       yearSelect.value       = year;
+        const name  = localStorage.getItem(KEY_NAME);
+        const phone = localStorage.getItem(KEY_PHONE);
+        const roll  = localStorage.getItem(KEY_ROLL);
+        const dept  = localStorage.getItem(KEY_DEPARTMENT);
+        const year  = localStorage.getItem(KEY_YEAR);
+        if (name && playerNameInput)   playerNameInput.value  = name;
+        if (phone && playerPhoneInput) playerPhoneInput.value = phone;
+        if (roll && rollNumberInput)   rollNumberInput.value  = roll;
+        if (dept && departmentSelect)  departmentSelect.value = dept;
+        if (year && yearSelect)        yearSelect.value       = year;
     }
 
     // ------------------------------------------------------------------
@@ -127,6 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     attachClearError(playerNameInput, nameError);
+    attachClearError(playerPhoneInput, phoneError);
     attachClearError(rollNumberInput, rollError);
     attachClearError(departmentSelect, departmentError);
     attachClearError(yearSelect, yearError);
@@ -150,12 +156,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // ------------------------------------------------------------------
     // 6. Save to localStorage helper
     // ------------------------------------------------------------------
-    function saveToStorage(name, roll, dept, year) {
+    function saveToStorage(name, roll, dept, year, phone) {
         try {
             localStorage.setItem(KEY_NAME,       name);
             localStorage.setItem(KEY_ROLL,       roll);
             localStorage.setItem(KEY_DEPARTMENT, dept);
             localStorage.setItem(KEY_YEAR,       year);
+            if (phone) localStorage.setItem(KEY_PHONE, phone);
         } catch (e) { console.warn('localStorage error:', e); }
     }
 
@@ -252,15 +259,20 @@ document.addEventListener('DOMContentLoaded', () => {
         playerForm.addEventListener('submit', (e) => {
             e.preventDefault();
 
-            const name = (playerNameInput ? playerNameInput.value : '').trim();
-            const roll = (rollNumberInput ? rollNumberInput.value : '').trim().toUpperCase();
-            const dept = departmentSelect ? departmentSelect.value : '';
-            const year = yearSelect       ? yearSelect.value       : '';
+            const name  = (playerNameInput  ? playerNameInput.value  : '').trim();
+            const phone = (playerPhoneInput ? playerPhoneInput.value : '').trim();
+            const roll  = (rollNumberInput  ? rollNumberInput.value  : '').trim().toUpperCase();
+            const dept  = departmentSelect ? departmentSelect.value : '';
+            const year  = yearSelect       ? yearSelect.value       : '';
 
             let hasError = false;
 
             if (!name || name.length < 2) {
                 showErr(playerNameInput, nameError, name ? 'Name must be at least 2 characters.' : 'Please enter your player name.');
+                hasError = true;
+            }
+            if (!phone || !/^[0-9]{10}$/.test(phone)) {
+                showErr(playerPhoneInput, phoneError, 'Please enter a valid 10-digit phone number.');
                 hasError = true;
             }
             if (!roll) {
@@ -279,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (hasError) { triggerShake(); return; }
 
             // Save locally right away so game.js can read it even if Firebase is slow
-            saveToStorage(name, roll, dept, year);
+            saveToStorage(name, roll, dept, year, phone);
 
             // Disable button, show loading state
             if (startBtn) {
@@ -291,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Register in Firebase (non-blocking — we navigate regardless)
             waitForFirebase((fb) => {
                 const doRegister = fb && fb.registerPlayer
-                    ? fb.registerPlayer({ name, rollNumber: roll, department: dept, year })
+                    ? fb.registerPlayer({ name, phoneNumber: phone, rollNumber: roll, department: dept, year })
                     : Promise.resolve(null);
 
                 doRegister.then((docId) => {

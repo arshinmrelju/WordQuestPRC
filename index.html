@@ -107,6 +107,17 @@
                         <div id="name-error" class="error-message" aria-live="polite"></div>
                     </div>
 
+                    <!-- Phone / Mobile Number Field -->
+                    <div class="form-group" id="field-phone">
+                        <label for="player-phone" class="form-label">Phone Number</label>
+                        <div class="input-wrapper">
+                            <input type="tel" id="player-phone" class="glass-input" placeholder="Enter 10-digit mobile number..."
+                                maxlength="10" autocomplete="off" required pattern="[0-9]{10}">
+                            <span class="input-focus-border"></span>
+                        </div>
+                        <div id="phone-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
                     <!-- Roll Number Field -->
                     <div class="form-group" id="field-roll">
                         <label for="roll-number" class="form-label">Roll Number</label>

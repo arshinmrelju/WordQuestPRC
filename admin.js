@@ -218,14 +218,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filtered.forEach((item, idx) => {
             const tr = document.createElement('tr');
-            const deptDisplay = item.department ? item.department.replace('Department of ', '') : '—';
-            const rollDisplay = item.rollNumber || '—';
-            const yearDisplay = item.year || '—';
-            const dateDisplay = item.dateDisplay || '—';
+            const deptDisplay  = item.department ? item.department.replace('Department of ', '') : '—';
+            const rollDisplay  = item.rollNumber || '—';
+            const yearDisplay  = item.year || '—';
+            const dateDisplay  = item.dateDisplay || '—';
+            const phoneDisplay = item.phoneNumber || '—';
 
             tr.innerHTML = `
                 <td><strong class="gold-text">${escapeHtml(rollDisplay)}</strong></td>
                 <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
+                <td><a href="tel:${escapeHtml(phoneDisplay)}" style="color: var(--accent-gold-light); font-weight: 600; text-decoration: none;">${escapeHtml(phoneDisplay)}</a></td>
                 <td>${escapeHtml(deptDisplay)}</td>
                 <td><span class="diff-chip diff-medium">${escapeHtml(yearDisplay)}</span></td>
                 <td>${escapeHtml(dateDisplay)}</td>
@@ -478,14 +480,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('No registered players to export.');
                 return;
             }
-            csvContent += 'Roll Number,Player Name,Department,Year of Study,Registered Date\n';
+            csvContent += 'Roll Number,Player Name,Phone Number,Department,Year of Study,Registered Date\n';
             playersList.forEach(p => {
-                const roll = `"${(p.rollNumber || '').replace(/"/g, '""')}"`;
-                const name = `"${(p.name || '').replace(/"/g, '""')}"`;
-                const dept = `"${(p.department || '').replace(/"/g, '""')}"`;
-                const year = `"${(p.year || '').replace(/"/g, '""')}"`;
-                const date = `"${(p.dateDisplay || '').replace(/"/g, '""')}"`;
-                csvContent += `${roll},${name},${dept},${year},${date}\n`;
+                const roll  = `"${(p.rollNumber   || '').replace(/"/g, '""')}"`;
+                const name  = `"${(p.name         || '').replace(/"/g, '""')}"`;
+                const phone = `"${(p.phoneNumber  || '').replace(/"/g, '""')}"`;
+                const dept  = `"${(p.department   || '').replace(/"/g, '""')}"`;
+                const year  = `"${(p.year         || '').replace(/"/g, '""')}"`;
+                const date  = `"${(p.dateDisplay  || '').replace(/"/g, '""')}"`;
+                csvContent += `${roll},${name},${phone},${dept},${year},${date}\n`;
             });
         } else {
             if (leaderboardList.length === 0) {
