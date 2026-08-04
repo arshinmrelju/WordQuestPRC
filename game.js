@@ -70,7 +70,15 @@ const DIRS = [
 class WordSearch {
 
     constructor() {
-        this.gridSize   = GRID_SIZE;
+        this.level           = 1;
+        this.levelTitle      = 'Novice';
+        this.levelMultiplier = 1.0;
+        this.gridSize        = GRID_SIZE;
+        this.wordCount       = WORD_COUNT;
+        this.gameSecs        = GAME_SECS;
+        this.directions      = DIRS;
+        this.useSmartGarbage = false;
+
         this.grid       = [];        // 2D array of letters
         this.words      = [];        // chosen words
         this.placed     = {};        // word → [{r,c},...] cell list
@@ -88,8 +96,99 @@ class WordSearch {
         this._timer     = null;
     }
 
+    /* ── PROGRESSIVE DIFFICULTY LEVELLING ───── */
+    _loadPlayerLevel() {
+        const key = this._getPlayerKey();
+        try {
+            const stored = localStorage.getItem('wordQuest_level_' + key);
+            this.level = Math.max(1, parseInt(stored || '1', 10) || 1);
+        } catch (e) {
+            this.level = 1;
+        }
+    }
+
+    _incrementPlayerLevel() {
+        const key = this._getPlayerKey();
+        this.level += 1;
+        try {
+            localStorage.setItem('wordQuest_level_' + key, String(this.level));
+        } catch (e) {}
+    }
+
+    _applyDifficulty() {
+        const lvl = this.level;
+        let timerSecs = 300;
+        let count     = 8;
+        let size      = 12;
+        let dirs      = [
+            [1, 0],  // right
+            [0, 1],  // down
+            [1, 1]   // diagonal down-right
+        ];
+        let smartGarbage = false;
+        let title     = 'Novice';
+        let mult      = 1.0;
+
+        if (lvl === 2) {
+            timerSecs    = 240; // 4 mins
+            count        = 9;
+            size         = 12;
+            dirs         = [
+                [1, 0], [0, 1], [1, 1],
+                [-1, 0], [0, -1] // + reverse horizontal & vertical
+            ];
+            smartGarbage = true;
+            title        = 'Apprentice';
+            mult         = 1.25;
+        } else if (lvl === 3) {
+            timerSecs    = 180; // 3 mins
+            count        = 10;
+            size         = 13;
+            dirs         = [
+                [1, 0], [0, 1], [1, 1], [-1, 1],
+                [-1, 0], [0, -1], [1, -1], [-1, -1] // all 8 directions
+            ];
+            smartGarbage = true;
+            title        = 'Scholar';
+            mult         = 1.5;
+        } else if (lvl === 4) {
+            timerSecs    = 150; // 2.5 mins
+            count        = 11;
+            size         = 13;
+            dirs         = [
+                [1, 0], [0, 1], [1, 1], [-1, 1],
+                [-1, 0], [0, -1], [1, -1], [-1, -1]
+            ];
+            smartGarbage = true;
+            title        = 'Master';
+            mult         = 1.75;
+        } else if (lvl >= 5) {
+            timerSecs    = Math.max(90, 120 - (lvl - 5) * 10); // 2 mins down to 90s
+            count        = Math.min(14, 12 + Math.floor((lvl - 5) / 2));
+            size         = 14;
+            dirs         = [
+                [1, 0], [0, 1], [1, 1], [-1, 1],
+                [-1, 0], [0, -1], [1, -1], [-1, -1]
+            ];
+            smartGarbage = true;
+            title        = `Grandmaster Lvl ${lvl}`;
+            mult         = 2.0 + (lvl - 5) * 0.25;
+        }
+
+        this.gridSize        = size;
+        this.wordCount       = count;
+        this.gameSecs        = timerSecs;
+        this._remaining      = timerSecs;
+        this.directions      = dirs;
+        this.useSmartGarbage = smartGarbage;
+        this.levelTitle      = title;
+        this.levelMultiplier = mult;
+    }
+
     /* ── BOOT ─────────────────────────────────── */
     init() {
+        this._loadPlayerLevel();
+        this._applyDifficulty();
         this._loadCumulativeScore();
         this._displayPlayerBadge();
         this._pickWords();
@@ -120,10 +219,12 @@ class WordSearch {
         this.placed     = {};
         this.foundWords = new Set();
         this.score      = 0;
-        this._remaining = GAME_SECS;
         this.selecting  = false;
         this.selStart   = null;
         this.selCells   = [];
+
+        this._loadPlayerLevel();
+        this._applyDifficulty();
 
         this._pickWords();
         this._buildGrid();
@@ -236,7 +337,7 @@ class WordSearch {
         let pool = WORD_BANK;
         try {
             const custom = JSON.parse(localStorage.getItem('wordQuest_customWords') || '[]');
-            if (Array.isArray(custom) && custom.length >= WORD_COUNT) {
+            if (Array.isArray(custom) && custom.length >= this.wordCount) {
                 pool = custom;
             }
         } catch (e) {
@@ -257,17 +358,17 @@ class WordSearch {
         const pool = [...this.candidatePool].sort(() => Math.random() - 0.5);
 
         for (const word of pool) {
-            if (placedWords.length >= WORD_COUNT) break;
+            if (placedWords.length >= this.wordCount) break;
             if (this._placeOne(word)) {
                 placedWords.push(word);
             }
         }
 
-        // If pool was exhausted before reaching WORD_COUNT, retry with default WORD_BANK fallback
-        if (placedWords.length < WORD_COUNT) {
+        // If pool was exhausted before reaching this.wordCount, retry with default WORD_BANK fallback
+        if (placedWords.length < this.wordCount) {
             const fallbackPool = [...WORD_BANK].sort(() => Math.random() - 0.5);
             for (const word of fallbackPool) {
-                if (placedWords.length >= WORD_COUNT) break;
+                if (placedWords.length >= this.wordCount) break;
                 if (!placedWords.includes(word) && this._placeOne(word)) {
                     placedWords.push(word);
                 }
@@ -282,7 +383,7 @@ class WordSearch {
         if (len > this.gridSize) return false;
 
         let attempts = 0;
-        const directions = [...DIRS].sort(() => Math.random() - 0.5);
+        const directions = [...this.directions].sort(() => Math.random() - 0.5);
 
         while (attempts < 500) {
             attempts++;
@@ -337,10 +438,20 @@ class WordSearch {
 
     _fillGarbage() {
         const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let wordLetterPool = [];
+        if (this.useSmartGarbage && this.words && this.words.length > 0) {
+            wordLetterPool = this.words.join('').split('');
+        }
+
         for (let r = 0; r < this.gridSize; r++) {
             for (let c = 0; c < this.gridSize; c++) {
                 if (this.grid[r][c] === '') {
-                    this.grid[r][c] = alpha[Math.floor(Math.random() * 26)];
+                    if (wordLetterPool.length > 0 && Math.random() < 0.65) {
+                        // 65% chance to pick distractor letter from target words for tricky near-matches!
+                        this.grid[r][c] = wordLetterPool[Math.floor(Math.random() * wordLetterPool.length)];
+                    } else {
+                        this.grid[r][c] = alpha[Math.floor(Math.random() * 26)];
+                    }
                 }
             }
         }
@@ -525,8 +636,10 @@ class WordSearch {
     _updateHUD() {
         const found = document.getElementById('found-count');
         const score = document.getElementById('score-val');
+        const levelVal = document.getElementById('level-val');
         if (found) found.textContent = `${this.foundWords.size} / ${this.words.length}`;
         if (score) score.textContent = this.score;
+        if (levelVal) levelVal.textContent = `Lvl ${this.level}`;
         const cumEl = document.getElementById('cumulative-score');
         if (cumEl) cumEl.textContent = this.cumulativeScore;
     }
@@ -555,7 +668,7 @@ class WordSearch {
         const m   = Math.floor(this._remaining / 60);
         const s   = this._remaining % 60;
         const str = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-        const pct = this._remaining / GAME_SECS;
+        const pct = this._remaining / this.gameSecs;
         const isDanger = pct < 0.25;
 
         const timerEl = document.getElementById('timer-val');
@@ -581,26 +694,27 @@ class WordSearch {
         const remaining = this._remaining;
         if (remaining <= 0) return { totalBonus: 0, timeBonus: 0, speedTierBonus: 0, tierName: '' };
 
-        // Base time bonus: 2 points per unused second
-        const timeBonus = remaining * 2;
+        // Base time bonus: 2 points per unused second (scaled by Level Multiplier)
+        const timeBonus = Math.round(remaining * 2 * this.levelMultiplier);
 
-        // Speed tier bonus based on completion time (out of 300 seconds total)
-        const timeTaken = GAME_SECS - remaining;
+        // Speed tier bonus based on completion time ratio
+        const timeTaken = this.gameSecs - remaining;
+        const ratio = timeTaken / this.gameSecs;
         let speedTierBonus = 0;
         let tierName = '';
 
-        if (timeTaken <= 60) {
-            speedTierBonus = 200;
-            tierName = '⚡ Lightning Speed (<1m)';
-        } else if (timeTaken <= 120) {
-            speedTierBonus = 120;
-            tierName = '🚀 Super Fast (<2m)';
-        } else if (timeTaken <= 180) {
-            speedTierBonus = 70;
-            tierName = '🏃 Fast Finish (<3m)';
-        } else if (timeTaken <= 240) {
-            speedTierBonus = 30;
-            tierName = '⏱️ Quick Finish (<4m)';
+        if (ratio <= 0.25) {
+            speedTierBonus = Math.round(200 * this.levelMultiplier);
+            tierName = '⚡ Lightning Speed';
+        } else if (ratio <= 0.40) {
+            speedTierBonus = Math.round(120 * this.levelMultiplier);
+            tierName = '🚀 Super Fast';
+        } else if (ratio <= 0.60) {
+            speedTierBonus = Math.round(70 * this.levelMultiplier);
+            tierName = '🏃 Fast Finish';
+        } else if (ratio <= 0.80) {
+            speedTierBonus = Math.round(30 * this.levelMultiplier);
+            tierName = '⏱️ Quick Finish';
         }
 
         const totalBonus = timeBonus + speedTierBonus;
@@ -616,19 +730,21 @@ class WordSearch {
         this.score += totalBonus;
         this._updateHUD();
         this._saveScore();
+        this._incrementPlayerLevel(); // ⚡ Advance level for next round
 
         const emojiEl = document.getElementById('end-emoji');
         if (emojiEl) emojiEl.textContent = '🏆';
         
         const titleEl = document.getElementById('end-title');
-        if (titleEl) titleEl.textContent = 'You Found Them All!';
+        if (titleEl) titleEl.textContent = `Level ${this.level} Cleared!`;
         
         const subEl = document.getElementById('end-sub');
         let bonusInfo = `+${totalBonus} speed bonus (${timeBonus}s time + ${speedTierBonus} speed tier)`;
+        let levelUpInfo = `🔥 Level Up! Next round will be Level ${this.level + 1} (Harder grid & more words!)`;
         if (tierName) {
-            subEl.textContent = `${tierName}! All ${this.words.length} words found! ${bonusInfo}`;
+            subEl.textContent = `${tierName}! All ${this.words.length} words found! ${bonusInfo}. ${levelUpInfo}`;
         } else {
-            subEl.textContent = `All ${this.words.length} words found! ${bonusInfo}`;
+            subEl.textContent = `All ${this.words.length} words found! ${bonusInfo}. ${levelUpInfo}`;
         }
 
         const numEl = document.getElementById('score-result-num');
@@ -650,6 +766,7 @@ class WordSearch {
     _timeUp() {
         this._unregisterActiveGame();
         this._saveScore();
+        this._incrementPlayerLevel(); // ⚡ Advance level for next round
 
         // 1. Reveal answers on grid immediately
         this._revealAnswers();
@@ -661,12 +778,12 @@ class WordSearch {
             if (emojiEl) emojiEl.textContent = '⏰';
             
             const titleEl = document.getElementById('end-title');
-            if (titleEl) titleEl.textContent = "Time's Up!";
+            if (titleEl) titleEl.textContent = `Level ${this.level} Time's Up!`;
             
             const unfoundCount = this.words.length - this.foundWords.size;
             const subEl = document.getElementById('end-sub');
             if (subEl) {
-                subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) are highlighted in orange on the grid!' : ''}`;
+                subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) revealed!' : ''} 🔥 Next round will be Level ${this.level + 1}!`;
             }
             
             const numEl = document.getElementById('score-result-num');
