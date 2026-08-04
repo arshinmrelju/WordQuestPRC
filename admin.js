@@ -580,7 +580,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // ----------------------------------------------------------------------
     // 10. Boot Admin Controller & Firebase Live Sync
     // ----------------------------------------------------------------------
+    function waitForFirebase(cb, retries = 40, delay = 250) {
+        if (window.WordQuestFirebase) { cb(); return; }
+        if (retries <= 0) { console.warn('[Admin] Firebase service not found after waiting.'); return; }
+        setTimeout(() => waitForFirebase(cb, retries - 1, delay), delay);
+    }
+
     function initFirebaseSync() {
+        waitForFirebase(() => {
         if (!window.WordQuestFirebase) return;
 
         // 1. Subscribe to Live Registered Players
@@ -644,6 +651,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (liveEl) liveEl.textContent = count;
             });
         }
+        }); // end waitForFirebase
     }
 
     // ----------------------------------------------------------------------
