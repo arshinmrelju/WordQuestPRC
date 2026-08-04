@@ -53,6 +53,27 @@
             </div>
         </header>
 
+        <!-- Global Game Session Control Card -->
+        <section class="glass-card game-control-card animate-fade-in">
+            <div class="game-control-status-group">
+                <span id="game-status-dot" style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; box-shadow: 0 0 12px #10b981; flex-shrink: 0;"></span>
+                <div>
+                    <div class="game-control-status-label">Global Game Control Status</div>
+                    <div id="game-status-text" class="game-control-status-val" style="color: #10b981;">GAME STARTED (ONLINE)</div>
+                </div>
+            </div>
+            <div class="game-control-actions">
+                <button type="button" id="start-game-btn" class="glass-btn btn-sm btn-game-start">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span>Start Game</span>
+                </button>
+                <button type="button" id="end-game-btn" class="glass-btn btn-sm btn-game-end">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                    <span>End Game</span>
+                </button>
+            </div>
+        </section>
+
         <!-- Stats Overview Cards Grid -->
         <section class="admin-stats-grid animate-fade-in">
             <div class="glass-card stat-widget">

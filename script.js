@@ -160,18 +160,74 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ------------------------------------------------------------------
-    // 7. Navigate to game
+    // 7. Navigate to game (with game-active gate)
     // ------------------------------------------------------------------
     function launchGame(btn) {
+        const doNavigate = () => {
+            document.body.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
+            document.body.style.opacity    = '0.7';
+            document.body.style.transform  = 'scale(0.99)';
+            setTimeout(() => { window.location.href = 'game.html'; }, 380);
+        };
+
+        const blockLaunch = () => {
+            if (btn) {
+                btn.disabled = false;
+                const t = btn.querySelector('.btn-text');
+                if (t) t.textContent = 'Begin Quest';
+            }
+            document.body.style.opacity   = '';
+            document.body.style.transform = '';
+            showGameClosedBanner();
+        };
+
         if (btn) {
             btn.disabled = true;
             const t = btn.querySelector('.btn-text');
-            if (t) t.textContent = 'Launching Quest...';
+            if (t) t.textContent = 'Checking access...';
         }
-        document.body.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
-        document.body.style.opacity    = '0.7';
-        document.body.style.transform  = 'scale(0.99)';
-        setTimeout(() => { window.location.href = 'game.html'; }, 380);
+
+        if (window.WordQuestFirebase && window.WordQuestFirebase.getGameStateFromFirestore) {
+            window.WordQuestFirebase.getGameStateFromFirestore().then((isActive) => {
+                if (!isActive) { blockLaunch(); } else { doNavigate(); }
+            }).catch(() => {
+                doNavigate(); // offline fallback — let them through
+            });
+        } else {
+            doNavigate(); // Firebase not loaded yet — let them through
+        }
+    }
+
+    function showGameClosedBanner() {
+        let banner = document.getElementById('game-closed-banner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'game-closed-banner';
+            banner.style.cssText = [
+                'position: fixed', 'top: 50%', 'left: 50%',
+                'transform: translate(-50%, -50%)',
+                'background: linear-gradient(135deg, rgba(239,68,68,0.95) 0%, rgba(185,28,28,0.95) 100%)',
+                'color: white', 'padding: 2rem 2.5rem', 'border-radius: 1.25rem',
+                'box-shadow: 0 25px 60px rgba(0,0,0,0.6)', 'z-index: 9999',
+                'text-align: center', 'max-width: 380px', 'width: 90%',
+                'backdrop-filter: blur(12px)', 'border: 1px solid rgba(255,255,255,0.15)',
+                'font-family: inherit', 'animation: fadeIn 0.3s ease'
+            ].join(';');
+            banner.innerHTML = `
+                <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">⛔</div>
+                <h2 style="font-size: 1.35rem; font-weight: 800; margin: 0 0 0.5rem;">Game Closed</h2>
+                <p style="font-size: 0.9rem; opacity: 0.9; margin: 0 0 1.25rem; line-height: 1.5;">
+                    The admin has ended this game session.<br>Please wait for the next round to begin.
+                </p>
+                <button onclick="document.getElementById('game-closed-banner').remove()"
+                    style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+                    color: white; padding: 0.55rem 1.5rem; border-radius: 0.6rem;
+                    font-weight: 600; cursor: pointer; font-size: 0.9rem;">OK</button>
+            `;
+            document.body.appendChild(banner);
+        }
+        // Auto-dismiss after 6s
+        setTimeout(() => { if (banner) banner.remove(); }, 6000);
     }
 
     // ------------------------------------------------------------------

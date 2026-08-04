@@ -214,6 +214,71 @@
     50%       { opacity: 0.7; transform: scale(1.25); box-shadow: 0 0 0 5px rgba(45, 212, 191, 0); }
 }
 
+/* Global Game Control Executive Card */
+.game-control-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    padding: 1.1rem 1.5rem !important;
+}
+
+.game-control-status-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.game-control-status-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.game-control-status-val {
+    font-size: 1.15rem;
+    font-weight: 800;
+    margin-top: 2px;
+}
+
+.game-control-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-game-start {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25) !important;
+    transition: var(--transition-fast) !important;
+}
+
+.btn-game-start:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.38) !important;
+}
+
+.btn-game-end {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25) !important;
+    transition: var(--transition-fast) !important;
+}
+
+.btn-game-end:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.38) !important;
+}
+
+
 .widget-data {
     display: flex;
     flex-direction: column;

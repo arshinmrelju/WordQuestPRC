@@ -37,11 +37,38 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 /**
- * Save Score Record to Firestore Leaderboard
- * @param {Object} scoreData { name, department, year, score, difficulty }
+ * Save Score Record to Firestore Leaderboard using individual player tag doc ID (rollNumber|department|year)
+ * @param {Object} scoreData { id, name, department, year, rollNumber, score, difficulty, cumulativeScore }
  */
 export async function saveScoreToFirestore(scoreData) {
     try {
+        const { rollNumber, department, year, id } = scoreData;
+        let docId = id;
+        if (!docId) {
+            if (rollNumber && department && year) {
+                docId = `${rollNumber}|${department}|${year}`;
+            } else if (rollNumber) {
+                docId = rollNumber;
+            }
+        }
+
+        if (docId) {
+            const docRef = doc(db, "leaderboard", docId);
+            await setDoc(docRef, {
+                name: scoreData.name || "Player",
+                rollNumber: scoreData.rollNumber || "",
+                department: scoreData.department || "",
+                year: scoreData.year || "",
+                difficulty: scoreData.difficulty || "medium",
+                score: scoreData.score || 0,
+                cumulativeScore: scoreData.cumulativeScore || 0,
+                timestamp: serverTimestamp(),
+                date: new Date().toLocaleDateString()
+            }, { merge: true });
+            console.log("Score saved to Firestore leaderboard with ID:", docId);
+            return docId;
+        }
+
         const docRef = await addDoc(collection(db, "leaderboard"), {
             name: scoreData.name || "Player",
             rollNumber: scoreData.rollNumber || "",
@@ -53,7 +80,7 @@ export async function saveScoreToFirestore(scoreData) {
             timestamp: serverTimestamp(),
             date: new Date().toLocaleDateString()
         });
-        console.log("Score saved to Firestore with ID:", docRef.id);
+        console.log("Score saved to Firestore leaderboard with auto ID:", docRef.id);
         return docRef.id;
     } catch (e) {
         console.warn("Firestore save score error (falling back to LocalStorage):", e);
@@ -82,29 +109,28 @@ export function subscribeToLeaderboard(callback) {
     }
 }
 
-/**
- * Delete a Score Record from Firestore
- * @param {String} docId Document ID to delete
- */
-export async function deleteScoreFromFirestore(docId) {
-    if (!docId) return false;
-    try {
-        await deleteDoc(doc(db, "leaderboard", docId));
-        console.log("Document deleted from Firestore:", docId);
-        return true;
-    } catch (e) {
-        console.warn("Firestore delete document error:", e);
-        return false;
-    }
+export async function deleteScoreFromFirestore(target) {
+    return await deletePlayerFromFirestore(target);
 }
 
 /**
- * Save or update cumulative player score to Firestore
- * @param {Object} data { rollNumber, name, department, year, cumulativeScore }
+ * Save or update cumulative player score to Firestore using individual player tag doc ID (rollNumber|department|year)
+ * @param {Object} data { id, rollNumber, name, department, year, cumulativeScore }
  */
 export async function saveCumulativeScoreToFirestore(data) {
     try {
-        const docRef = doc(db, "cumulativeScores", data.rollNumber || 'anonymous');
+        const { rollNumber, department, year, id } = data;
+        let docId = id;
+        if (!docId) {
+            if (rollNumber && department && year) {
+                docId = `${rollNumber}|${department}|${year}`;
+            } else if (rollNumber) {
+                docId = rollNumber;
+            } else {
+                docId = 'anonymous';
+            }
+        }
+        const docRef = doc(db, "cumulativeScores", docId);
         await setDoc(docRef, {
             name: data.name || "Player",
             rollNumber: data.rollNumber || "",
@@ -113,7 +139,7 @@ export async function saveCumulativeScoreToFirestore(data) {
             cumulativeScore: data.cumulativeScore || 0,
             updatedAt: serverTimestamp()
         }, { merge: true });
-        console.log("Cumulative score saved to Firestore:", data.cumulativeScore);
+        console.log("Cumulative score saved to Firestore for ID:", docId, "Score:", data.cumulativeScore);
     } catch (e) {
         console.warn("Firestore cumulative score save error:", e);
     }
@@ -305,18 +331,134 @@ export function subscribeToPlayers(callback) {
 }
 
 /**
- * Delete a Player Registration Record from Firestore
- * @param {String} docId Document ID to delete
+ * Delete a Player Registration and ALL associated records by docId and/or player info
+ * @param {String|Object} target docId string or player object { id, rollNumber, department, year }
  */
-export async function deletePlayerFromFirestore(docId) {
-    if (!docId) return false;
+export async function deletePlayerFromFirestore(target) {
+    if (!target) return false;
+    let docId = typeof target === 'string' ? target : (target.id || '');
+    let rollNumber = typeof target === 'object' ? (target.rollNumber || '') : '';
+    let department = typeof target === 'object' ? (target.department || '') : '';
+    let year       = typeof target === 'object' ? (target.year || '') : '';
+
+    if (docId && docId.includes('|')) {
+        const parts = docId.split('|');
+        if (!rollNumber) rollNumber = parts[0];
+        if (!department) department = parts[1];
+        if (!year)       year       = parts[2];
+    }
+
     try {
-        await deleteDoc(doc(db, "players", docId));
-        console.log("Player document deleted from Firestore:", docId);
+        const collections = ["players", "leaderboard", "cumulativeScores"];
+        
+        // 1. Delete by direct docId
+        if (docId) {
+            for (const col of collections) {
+                await deleteDoc(doc(db, col, docId)).catch(() => {});
+            }
+        }
+
+        // 2. Delete by constructed composite ID if rollNumber/dept/year exist
+        if (rollNumber && department && year) {
+            const compId = `${rollNumber}|${department}|${year}`;
+            for (const col of collections) {
+                await deleteDoc(doc(db, col, compId)).catch(() => {});
+            }
+        }
+
+        // 3. Query & delete any matching documents by rollNumber across all collections
+        if (rollNumber) {
+            for (const col of collections) {
+                try {
+                    const q = query(collection(db, col), where("rollNumber", "==", rollNumber));
+                    const snap = await getDocs(q);
+                    const deletes = [];
+                    snap.forEach(d => deletes.push(deleteDoc(d.ref)));
+                    await Promise.all(deletes);
+                } catch (e) {}
+            }
+        }
+
+        console.log("Player completely deleted across Firestore collections for:", docId || rollNumber);
         return true;
     } catch (e) {
         console.warn("Firestore delete player error:", e);
         return false;
+    }
+}
+
+/**
+ * Delete ALL Player, Leaderboard, and Cumulative Score records from Firestore
+ */
+export async function clearAllDataFromFirestore() {
+    try {
+        const collectionsToClear = ["players", "leaderboard", "cumulativeScores"];
+        for (const colName of collectionsToClear) {
+            const snap = await getDocs(collection(db, colName));
+            const promises = snap.docs.map(d => deleteDoc(d.ref));
+            await Promise.all(promises);
+        }
+        console.log("All Firestore player & leaderboard data successfully cleared.");
+        return true;
+    } catch (e) {
+        console.warn("Firestore clearAllData error:", e);
+        return false;
+    }
+}
+
+
+/**
+ * Set Game Active state in Firestore
+ * @param {boolean} isActive
+ */
+export async function setGameStateInFirestore(isActive) {
+    try {
+        await setDoc(doc(db, "system_config", "game_control"), {
+            isGameActive: isActive,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        console.log("Game active state updated in Firestore:", isActive);
+        return true;
+    } catch (e) {
+        console.warn("Firestore setGameState error:", e);
+        return false;
+    }
+}
+
+/**
+ * Get current Game Active state from Firestore
+ */
+export async function getGameStateFromFirestore() {
+    try {
+        const docSnap = await getDoc(doc(db, "system_config", "game_control"));
+        if (docSnap.exists() && typeof docSnap.data().isGameActive === 'boolean') {
+            return docSnap.data().isGameActive;
+        }
+    } catch (e) {
+        console.warn("Firestore getGameState error:", e);
+    }
+    return true; // Default active if document not present
+}
+
+/**
+ * Subscribe to real-time Game Active state updates
+ * @param {Function} callback Called with boolean (isActive)
+ */
+export function subscribeToGameState(callback) {
+    try {
+        return onSnapshot(doc(db, "system_config", "game_control"), (docSnap) => {
+            if (docSnap.exists() && typeof docSnap.data().isGameActive === 'boolean') {
+                callback(docSnap.data().isGameActive);
+            } else {
+                callback(true); // Default active
+            }
+        }, (error) => {
+            console.warn("Game state snapshot error:", error);
+            callback(true);
+        });
+    } catch (e) {
+        console.warn("subscribeToGameState error:", e);
+        callback(true);
     }
 }
 
@@ -336,6 +478,10 @@ window.WordQuestFirebase = {
     registerActiveGame,
     unregisterActiveGame,
     subscribeToActiveGameCount,
-    saveCumulativeScoreToFirestore
+    saveCumulativeScoreToFirestore,
+    setGameStateInFirestore,
+    getGameStateFromFirestore,
+    subscribeToGameState,
+    clearAllDataFromFirestore
 };
 

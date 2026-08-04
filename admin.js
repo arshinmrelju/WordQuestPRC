@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><span class="diff-chip diff-medium">${escapeHtml(yearDisplay)}</span></td>
                 <td>${escapeHtml(dateDisplay)}</td>
                 <td style="text-align: right;">
-                    <button class="delete-row-btn" data-id="${item.id}" data-name="${escapeHtml(item.name || 'Player')}" title="Delete registration">
+                    <button class="delete-row-btn" data-id="${item.id}" data-roll="${escapeHtml(item.rollNumber || '')}" data-dept="${escapeHtml(item.department || '')}" data-year="${escapeHtml(item.year || '')}" data-name="${escapeHtml(item.name || 'Player')}" title="Delete registration">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     </button>
                 </td>
@@ -242,15 +242,21 @@ document.addEventListener('DOMContentLoaded', () => {
         playersTableBody.querySelectorAll('.delete-row-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const id = btn.getAttribute('data-id');
+                const roll = btn.getAttribute('data-roll') || '';
+                const dept = btn.getAttribute('data-dept') || '';
+                const year = btn.getAttribute('data-year') || '';
                 const name = btn.getAttribute('data-name');
-                if (!confirm(`Are you sure you want to delete registration for "${name}"?`)) return;
+                if (!confirm(`Are you sure you want to delete registration & score data for "${name}"?`)) return;
                 btn.disabled = true;
                 btn.innerHTML = '<span style="opacity:0.5">Deleting...</span>';
+                const target = { id, rollNumber: roll, department: dept, year };
                 const deleted = window.WordQuestFirebase && window.WordQuestFirebase.deletePlayerFromFirestore
-                    ? await window.WordQuestFirebase.deletePlayerFromFirestore(id).catch(() => false)
+                    ? await window.WordQuestFirebase.deletePlayerFromFirestore(target).catch(() => false)
                     : false;
                 if (deleted !== false) {
-                    playersList = playersList.filter(p => p.id !== id);
+                    playersList = playersList.filter(p => p.id !== id && p.rollNumber !== roll);
+                    leaderboardList = leaderboardList.filter(r => r.id !== id && r.rollNumber !== roll);
+                    saveLeaderboard();
                 }
                 updateStats();
                 renderPlayersTable();
@@ -341,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><span class="cum-score">${cumScore}</span></td>
                 <td>${escapeHtml(dateDisplay)}</td>
                 <td style="text-align: right;">
-                    <button class="delete-row-btn" data-id="${item.id}" data-name="${escapeHtml(item.name || 'Player')}" title="Delete score entry">
+                    <button class="delete-row-btn" data-id="${item.id}" data-roll="${escapeHtml(item.rollNumber || '')}" data-dept="${escapeHtml(item.department || '')}" data-year="${escapeHtml(item.year || '')}" data-name="${escapeHtml(item.name || 'Player')}" title="Delete score entry">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     </button>
                 </td>
@@ -353,15 +359,20 @@ document.addEventListener('DOMContentLoaded', () => {
         leaderboardTableBody.querySelectorAll('.delete-row-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const id = btn.getAttribute('data-id');
+                const roll = btn.getAttribute('data-roll') || '';
+                const dept = btn.getAttribute('data-dept') || '';
+                const year = btn.getAttribute('data-year') || '';
                 const name = btn.getAttribute('data-name');
-                if (!confirm(`Are you sure you want to delete score entry for "${name}"?`)) return;
+                if (!confirm(`Are you sure you want to delete score entry & registration for "${name}"?`)) return;
                 btn.disabled = true;
                 btn.innerHTML = '<span style="opacity:0.5">Deleting...</span>';
+                const target = { id, rollNumber: roll, department: dept, year };
                 const deleted = window.WordQuestFirebase && window.WordQuestFirebase.deleteScoreFromFirestore
-                    ? await window.WordQuestFirebase.deleteScoreFromFirestore(id).catch(() => false)
+                    ? await window.WordQuestFirebase.deleteScoreFromFirestore(target).catch(() => false)
                     : false;
                 if (deleted !== false) {
-                    leaderboardList = leaderboardList.filter(r => r.id !== id);
+                    leaderboardList = leaderboardList.filter(r => r.id !== id && r.rollNumber !== roll);
+                    playersList = playersList.filter(p => p.id !== id && p.rollNumber !== roll);
                     saveLeaderboard();
                 }
                 updateStats();
@@ -505,16 +516,33 @@ document.addEventListener('DOMContentLoaded', () => {
     if (exportBtn) exportBtn.addEventListener('click', exportToCSV);
 
     // ----------------------------------------------------------------------
-    // 8. Reset Data Button
+    // 8. Reset All Data Button (Erases Firestore & LocalStorage)
     // ----------------------------------------------------------------------
     if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to reset local leaderboard cache? This will not erase Firestore remote entries.')) {
-                leaderboardList = [];
-                saveLeaderboard();
-                updateStats();
-                renderCurrentTab();
+        clearBtn.addEventListener('click', async () => {
+            if (!confirm('⚠️ DANGER: Are you sure you want to PERMANENTLY ERASE ALL player registrations and leaderboard data from Firebase?')) return;
+            if (!confirm('Final Confirmation: This action CANNOT be undone. Proceed with full reset?')) return;
+            
+            clearBtn.disabled = true;
+            clearBtn.innerHTML = '<span>Erasing Firebase...</span>';
+
+            if (window.WordQuestFirebase && window.WordQuestFirebase.clearAllDataFromFirestore) {
+                await window.WordQuestFirebase.clearAllDataFromFirestore().catch(() => {});
             }
+            playersList = [];
+            leaderboardList = [];
+            leaderboardCache = [];
+            localStorage.removeItem(STORAGE_KEY_LEADERBOARD);
+
+            clearBtn.disabled = false;
+            clearBtn.innerHTML = `
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <span>Reset Data</span>
+            `;
+
+            updateStats();
+            renderCurrentTab();
+            alert('✅ All player and leaderboard data has been completely erased from Firebase!');
         });
     }
 
@@ -599,7 +627,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // 4. Live Games Counter
+        // 4. Subscribe to Game Control State (Start/End game status)
+        if (window.WordQuestFirebase.subscribeToGameState) {
+            window.WordQuestFirebase.subscribeToGameState((isActive) => {
+                updateGameStatusUI(isActive);
+            });
+        }
+
+        // 5. Live Games Counter
         if (window.WordQuestFirebase.subscribeToActiveGameCount) {
             window.WordQuestFirebase.subscribeToActiveGameCount((count) => {
                 const liveEl = document.getElementById('stat-live-games');
@@ -608,9 +643,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ----------------------------------------------------------------------
+    // Game Control Buttons & State Sync
+    // ----------------------------------------------------------------------
+    const startGameBtn   = document.getElementById('start-game-btn');
+    const endGameBtn     = document.getElementById('end-game-btn');
+    const gameStatusText = document.getElementById('game-status-text');
+    const gameStatusDot  = document.getElementById('game-status-dot');
+
+    function updateGameStatusUI(isActive) {
+        if (gameStatusText) {
+            gameStatusText.textContent = isActive ? 'GAME STARTED (ONLINE)' : 'GAME ENDED (CLOSED)';
+            gameStatusText.style.color = isActive ? '#10b981' : '#ef4444';
+        }
+        if (gameStatusDot) {
+            gameStatusDot.style.backgroundColor = isActive ? '#10b981' : '#ef4444';
+            gameStatusDot.style.boxShadow = isActive ? '0 0 12px #10b981' : '0 0 12px #ef4444';
+        }
+        if (startGameBtn) {
+            startGameBtn.style.opacity = isActive ? '0.5' : '1';
+            startGameBtn.style.pointerEvents = isActive ? 'none' : 'auto';
+        }
+        if (endGameBtn) {
+            endGameBtn.style.opacity = isActive ? '1' : '0.5';
+            endGameBtn.style.pointerEvents = isActive ? 'auto' : 'none';
+        }
+    }
+
+    if (startGameBtn) {
+        startGameBtn.addEventListener('click', async () => {
+            if (window.WordQuestFirebase && window.WordQuestFirebase.setGameStateInFirestore) {
+                await window.WordQuestFirebase.setGameStateInFirestore(true);
+                updateGameStatusUI(true);
+                alert('🟢 Game has been Started! Players can now join and play.');
+            }
+        });
+    }
+
+    if (endGameBtn) {
+        endGameBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to End the Game? This will close access to game.html for all players.')) {
+                if (window.WordQuestFirebase && window.WordQuestFirebase.setGameStateInFirestore) {
+                    await window.WordQuestFirebase.setGameStateInFirestore(false);
+                    updateGameStatusUI(false);
+                    alert('🔴 Game has been Ended! Access to game.html is now closed.');
+                }
+            }
+        });
+    }
+
     loadData();
     updateStats();
     renderPlayersTable();
     renderWordTags();
     initFirebaseSync();
 });
+

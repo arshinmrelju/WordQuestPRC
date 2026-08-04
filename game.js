@@ -135,6 +135,7 @@ class WordSearch {
         this._updateHUD();
         this._renderHistory();
         this._registerActiveGame();
+        this._listenForGameState();
     }
 
     /* ── FIREBASE ACTIVE GAME TRACKING ─────────── */
@@ -147,6 +148,19 @@ class WordSearch {
     _unregisterActiveGame() {
         if (window.WordQuestFirebase && window.WordQuestFirebase.unregisterActiveGame) {
             window.WordQuestFirebase.unregisterActiveGame();
+        }
+    }
+
+    _listenForGameState() {
+        if (window.WordQuestFirebase && window.WordQuestFirebase.subscribeToGameState) {
+            window.WordQuestFirebase.subscribeToGameState((isActive) => {
+                if (!isActive) {
+                    this._stopTimer();
+                    this._unregisterActiveGame();
+                    alert('⛔ The game has been Ended by the Admin. Access to game.html is closed.');
+                    window.location.href = 'index.html';
+                }
+            });
         }
     }
 
@@ -163,10 +177,22 @@ class WordSearch {
         }
     }
 
+    _getPlayerKey() {
+        const roll = localStorage.getItem('wordQuest_rollNumber') || '';
+        const dept = localStorage.getItem('wordQuest_department') || '';
+        const year = localStorage.getItem('wordQuest_yearOfStudy') || '';
+        if (roll && dept && year) {
+            return `${roll}|${dept}|${year}`;
+        }
+        return roll || 'anonymous';
+    }
+
     _loadCumulativeScore() {
+        const key = this._getPlayerKey();
         const roll = localStorage.getItem('wordQuest_rollNumber') || '';
         try {
-            this.cumulativeScore = parseInt(localStorage.getItem('wordQuest_cumulative_' + roll) || '0', 10) || 0;
+            const val = localStorage.getItem('wordQuest_cumulative_' + key) || (roll ? localStorage.getItem('wordQuest_cumulative_' + roll) : null);
+            this.cumulativeScore = parseInt(val || '0', 10) || 0;
         } catch (e) {
             this.cumulativeScore = 0;
         }
@@ -175,9 +201,11 @@ class WordSearch {
     }
 
     _saveCumulativeScore() {
+        const key = this._getPlayerKey();
         const roll = localStorage.getItem('wordQuest_rollNumber') || '';
         try {
-            localStorage.setItem('wordQuest_cumulative_' + roll, String(this.cumulativeScore));
+            localStorage.setItem('wordQuest_cumulative_' + key, String(this.cumulativeScore));
+            if (roll) localStorage.setItem('wordQuest_cumulative_' + roll, String(this.cumulativeScore));
         } catch (e) { /* noop */ }
     }
 
@@ -547,12 +575,44 @@ class WordSearch {
         }
     }
 
+    /* ── SPEED BONUS CALCULATION ───────────────── */
+    _calculateSpeedBonus() {
+        const remaining = this._remaining;
+        if (remaining <= 0) return { totalBonus: 0, timeBonus: 0, speedTierBonus: 0, tierName: '' };
+
+        // Base time bonus: 2 points per unused second
+        const timeBonus = remaining * 2;
+
+        // Speed tier bonus based on completion time (out of 300 seconds total)
+        const timeTaken = GAME_SECS - remaining;
+        let speedTierBonus = 0;
+        let tierName = '';
+
+        if (timeTaken <= 60) {
+            speedTierBonus = 200;
+            tierName = '⚡ Lightning Speed (<1m)';
+        } else if (timeTaken <= 120) {
+            speedTierBonus = 120;
+            tierName = '🚀 Super Fast (<2m)';
+        } else if (timeTaken <= 180) {
+            speedTierBonus = 70;
+            tierName = '🏃 Fast Finish (<3m)';
+        } else if (timeTaken <= 240) {
+            speedTierBonus = 30;
+            tierName = '⏱️ Quick Finish (<4m)';
+        }
+
+        const totalBonus = timeBonus + speedTierBonus;
+        return { totalBonus, timeBonus, speedTierBonus, tierName };
+    }
+
     /* ── END STATES ───────────────────────────── */
     _win() {
         this._stopTimer();
         this._unregisterActiveGame();
-        const bonus = this._remaining;
-        this.score += bonus;
+        
+        const { totalBonus, timeBonus, speedTierBonus, tierName } = this._calculateSpeedBonus();
+        this.score += totalBonus;
         this._updateHUD();
         this._saveScore();
 
@@ -563,10 +623,21 @@ class WordSearch {
         if (titleEl) titleEl.textContent = 'You Found Them All!';
         
         const subEl = document.getElementById('end-sub');
-        if (subEl) subEl.textContent = `All ${this.words.length} words found! +${bonus} time bonus.`;
-        
+        let bonusInfo = `+${totalBonus} speed bonus (${timeBonus}s time + ${speedTierBonus} speed tier)`;
+        if (tierName) {
+            subEl.textContent = `${tierName}! All ${this.words.length} words found! ${bonusInfo}`;
+        } else {
+            subEl.textContent = `All ${this.words.length} words found! ${bonusInfo}`;
+        }
+
         const numEl = document.getElementById('score-result-num');
         if (numEl) numEl.textContent = this.score;
+
+        const bonusNumEl = document.getElementById('time-bonus-num');
+        if (bonusNumEl) bonusNumEl.textContent = `+${totalBonus}`;
+
+        const bonusLabelEl = document.getElementById('time-bonus-label');
+        if (bonusLabelEl) bonusLabelEl.textContent = tierName ? `speed bonus (${tierName})` : 'speed bonus';
 
         const cumEl = document.getElementById('cumulative-result-num');
         if (cumEl) cumEl.textContent = this.cumulativeScore;
@@ -599,6 +670,12 @@ class WordSearch {
             
             const numEl = document.getElementById('score-result-num');
             if (numEl) numEl.textContent = this.score;
+
+            const bonusNumEl = document.getElementById('time-bonus-num');
+            if (bonusNumEl) bonusNumEl.textContent = `+0`;
+
+            const bonusLabelEl = document.getElementById('time-bonus-label');
+            if (bonusLabelEl) bonusLabelEl.textContent = 'speed bonus';
 
             const cumEl = document.getElementById('cumulative-result-num');
             if (cumEl) cumEl.textContent = this.cumulativeScore;
@@ -673,6 +750,7 @@ class WordSearch {
 
         const today = new Date().toLocaleDateString();
         const record = {
+            id: this._getPlayerKey(),
             name, rollNumber, department, year,
             score: this.score,
             cumulativeScore: this.cumulativeScore,
@@ -700,7 +778,7 @@ class WordSearch {
         this._saveToFirestore(record, 5);
 
         // 4. Save cumulative score to Firestore
-        this._saveCumulativeToFirestore({ name, rollNumber, department, year, cumulativeScore: this.cumulativeScore }, 5);
+        this._saveCumulativeToFirestore({ id: this._getPlayerKey(), name, rollNumber, department, year, cumulativeScore: this.cumulativeScore }, 5);
     }
 
     _saveToFirestore(record, attempts) {
@@ -784,8 +862,25 @@ const WS = new WordSearch();
  * within 3 seconds (offline / blocked).
  */
 function bootGame() {
+    function startBoot() {
+        if (window.WordQuestFirebase && window.WordQuestFirebase.getGameStateFromFirestore) {
+            window.WordQuestFirebase.getGameStateFromFirestore().then((isActive) => {
+                if (!isActive) {
+                    alert('⛔ The game has been Ended by the Admin. Access to game.html is closed right now.');
+                    window.location.href = 'index.html';
+                    return;
+                }
+                WS.init();
+            }).catch(() => {
+                WS.init();
+            });
+        } else {
+            WS.init();
+        }
+    }
+
     if (window.WordQuestFirebase) {
-        WS.init();
+        startBoot();
     } else {
         // Firebase module not yet ready — poll briefly then give up
         let attempts = 0;
@@ -793,7 +888,7 @@ function bootGame() {
             attempts++;
             if (window.WordQuestFirebase || attempts >= 30) {
                 clearInterval(poll);
-                WS.init();
+                startBoot();
             }
         }, 100);
     }
