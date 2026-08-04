@@ -103,6 +103,7 @@ class WordSearch {
         this._updateHUD();
         this._renderHistory();
         this._registerActiveGame();
+        this._listenForGameState(); // 🔴 Real-time admin end-game kick
 
         // Load custom word bank from Firestore (for next game or restart)
         this._loadWordBankFromFirebase();
