@@ -113,6 +113,7 @@ class WordSearch {
         try {
             localStorage.setItem('wordQuest_level_' + key, String(this.level));
         } catch (e) {}
+        this._syncLevelToFirestore();
     }
 
     _applyDifficulty() {
@@ -249,10 +250,43 @@ class WordSearch {
         this._listenForGameState();
     }
 
-    /* ── FIREBASE ACTIVE GAME TRACKING ─────────── */
+    /* ── FIREBASE ACTIVE GAME & LEVEL TRACKING ─── */
     _registerActiveGame() {
         if (window.WordQuestFirebase && window.WordQuestFirebase.registerActiveGame) {
-            window.WordQuestFirebase.registerActiveGame();
+            window.WordQuestFirebase.registerActiveGame({
+                level: this.level,
+                levelTitle: this.levelTitle,
+                score: this.score,
+                cumulativeScore: this.cumulativeScore
+            });
+        }
+        this._syncLiveGrid();
+    }
+
+    _syncLevelToFirestore() {
+        if (window.WordQuestFirebase && window.WordQuestFirebase.updatePlayerLevelInFirestore) {
+            window.WordQuestFirebase.updatePlayerLevelInFirestore({
+                level: this.level,
+                levelTitle: this.levelTitle,
+                score: this.score,
+                cumulativeScore: this.cumulativeScore + this.score
+            });
+        }
+    }
+
+    _syncLiveGrid() {
+        if (window.WordQuestFirebase && window.WordQuestFirebase.syncLiveGridToFirestore) {
+            window.WordQuestFirebase.syncLiveGridToFirestore({
+                grid: this.grid,
+                words: this.words,
+                placed: this.placed,
+                foundWords: Array.from(this.foundWords),
+                gridSize: this.gridSize,
+                remainingSeconds: this._remaining,
+                score: this.score,
+                level: this.level,
+                levelTitle: this.levelTitle
+            });
         }
     }
 
@@ -638,6 +672,7 @@ class WordSearch {
         this._updateHUD();
         this._toast(`✓ Found: ${word}`, 1400);
         this._saveLiveProgress(); // ⚡ Instantly update Firestore leaderboard when a word is found!
+        this._syncLiveGrid();     // ⚡ Sync live 2D grid matrix to Firestore for admin spectators!
 
         // All found?
         if (this.foundWords.size === this.words.length) {
@@ -916,6 +951,7 @@ class WordSearch {
                 cumulativeScore: currentCumulative
             }).catch(() => {});
         }
+        this._syncLevelToFirestore();
     }
 
     _saveScore() {

@@ -55,17 +55,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // DOM Elements - Tabs
     const tabBtnPlayers     = document.getElementById('tab-btn-players');
+    const tabBtnLive        = document.getElementById('tab-btn-live');
     const tabBtnLeaderboard = document.getElementById('tab-btn-leaderboard');
     const viewPlayersTable  = document.getElementById('view-players-table');
+    const viewLiveTable     = document.getElementById('view-live-table');
     const viewLeaderboardTable = document.getElementById('view-leaderboard-table');
     const badgePlayersCount = document.getElementById('badge-players-count');
+    const badgeLiveCount    = document.getElementById('badge-live-count');
     const badgeLeaderboardCount = document.getElementById('badge-leaderboard-count');
+    const statCardLive      = document.getElementById('stat-card-live');
 
     // DOM Elements - Filters & Tables
     const searchInput = document.getElementById('admin-search-input');
     const deptFilter  = document.getElementById('admin-dept-filter');
     const yearFilter  = document.getElementById('admin-year-filter');
     const playersTableBody = document.getElementById('admin-players-table-body');
+    const liveTableBody    = document.getElementById('admin-live-table-body');
     const leaderboardTableBody = document.getElementById('admin-leaderboard-table-body');
 
     // DOM Elements - Action Buttons
@@ -79,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let playersList     = []; // Registered players from Firestore 'players'
     let leaderboardList = []; // Game scores from Firestore 'leaderboard'
     let customWordsList = [];
-    let currentTab      = 'players'; // 'players' | 'leaderboard'
+    let currentTab      = 'players'; // 'players' | 'live' | 'leaderboard'
     let firebaseReady   = false;    // true once Firestore has responded at least once
 
     // ----------------------------------------------------------------------
@@ -87,23 +92,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // ----------------------------------------------------------------------
     function switchTab(tab) {
         currentTab = tab;
-        if (tab === 'players') {
-            if (tabBtnPlayers) tabBtnPlayers.classList.add('active');
-            if (tabBtnLeaderboard) tabBtnLeaderboard.classList.remove('active');
-            if (viewPlayersTable) viewPlayersTable.classList.remove('hidden');
-            if (viewLeaderboardTable) viewLeaderboardTable.classList.add('hidden');
-            renderPlayersTable();
-        } else {
-            if (tabBtnLeaderboard) tabBtnLeaderboard.classList.add('active');
-            if (tabBtnPlayers) tabBtnPlayers.classList.remove('active');
-            if (viewLeaderboardTable) viewLeaderboardTable.classList.remove('hidden');
-            if (viewPlayersTable) viewPlayersTable.classList.add('hidden');
-            renderLeaderboardTable();
-        }
+        if (tabBtnPlayers)     tabBtnPlayers.classList.toggle('active', tab === 'players');
+        if (tabBtnLive)        tabBtnLive.classList.toggle('active', tab === 'live');
+        if (tabBtnLeaderboard) tabBtnLeaderboard.classList.toggle('active', tab === 'leaderboard');
+
+        if (viewPlayersTable)     viewPlayersTable.classList.toggle('hidden', tab !== 'players');
+        if (viewLiveTable)        viewLiveTable.classList.toggle('hidden', tab !== 'live');
+        if (viewLeaderboardTable) viewLeaderboardTable.classList.toggle('hidden', tab !== 'leaderboard');
+
+        renderCurrentTab();
     }
 
     if (tabBtnPlayers)     tabBtnPlayers.addEventListener('click', () => switchTab('players'));
+    if (tabBtnLive)        tabBtnLive.addEventListener('click', () => switchTab('live'));
     if (tabBtnLeaderboard) tabBtnLeaderboard.addEventListener('click', () => switchTab('leaderboard'));
+    if (statCardLive)      statCardLive.addEventListener('click', () => switchTab('live'));
 
     // ----------------------------------------------------------------------
     // 2. Load Local Data Backup
@@ -124,14 +127,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function isPlayerLiveInGame(item) {
+        return item && item.active === true && item.liveState && Array.isArray(item.liveState.grid) && item.liveState.grid.length > 0;
+    }
+
+    function getStatusBadgeHtml(isActive) {
+        if (isActive) {
+            return `<span class="status-pill-live"><span class="live-pulse-dot"></span>LIVE</span>`;
+        }
+        return `<span class="status-pill-offline">Offline</span>`;
+    }
+
+    function getLevelBadgeHtml(lvlNum, lvlTitle) {
+        const lvl = lvlNum || 1;
+        const title = lvlTitle || (lvl === 1 ? 'Novice' : lvl === 2 ? 'Apprentice' : lvl === 3 ? 'Scholar' : lvl === 4 ? 'Master' : `Grandmaster Lvl ${lvl}`);
+        const isMaster = lvl >= 4;
+        return `<span class="level-chip ${isMaster ? 'level-chip-master' : ''}">Lvl ${lvl} (${escapeHtml(title)})</span>`;
+    }
+
     // ----------------------------------------------------------------------
     // 3. Compute Dashboard Statistics
     // ----------------------------------------------------------------------
     function updateStats() {
         // Total Registered Participants Count (deduplicated)
-        const totalReg = deduplicatePlayers(playersList).length;
+        const dedupedReg = deduplicatePlayers(playersList);
+        const totalReg = dedupedReg.length;
         if (statTotalPlayers) statTotalPlayers.textContent = totalReg;
         if (badgePlayersCount) badgePlayersCount.textContent = totalReg;
+
+        // Live Players Count (Strictly active inside game.html with generated grid)
+        const liveCount = dedupedReg.filter(p => isPlayerLiveInGame(p)).length;
+        if (badgeLiveCount) badgeLiveCount.textContent = liveCount;
+        const statLiveGames = document.getElementById('stat-live-games');
+        if (statLiveGames) statLiveGames.textContent = liveCount;
 
         // Leaderboard Count — deduplicated unique players (same key as renderLeaderboardTable)
         const uniquePlayers = {};
@@ -210,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filtered.length === 0) {
             playersTableBody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                    <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
                         No registered players match the current criteria.
                     </td>
                 </tr>
@@ -225,10 +253,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const yearDisplay  = item.year || '—';
             const dateDisplay  = item.dateDisplay || '—';
             const phoneDisplay = item.phoneNumber || '—';
+            const statusHtml   = getStatusBadgeHtml(isPlayerLiveInGame(item));
+            const levelHtml    = getLevelBadgeHtml(item.currentLevel, item.levelTitle);
 
             tr.innerHTML = `
                 <td><strong class="gold-text">${escapeHtml(rollDisplay)}</strong></td>
                 <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
+                <td>${statusHtml}</td>
+                <td>${levelHtml}</td>
                 <td><a href="tel:${escapeHtml(phoneDisplay)}" style="color: var(--accent-gold-light); font-weight: 600; text-decoration: none;">${escapeHtml(phoneDisplay)}</a></td>
                 <td>${escapeHtml(deptDisplay)}</td>
                 <td><span class="diff-chip diff-medium">${escapeHtml(yearDisplay)}</span></td>
@@ -266,6 +298,212 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderPlayersTable();
             });
         });
+    }
+
+    // ----------------------------------------------------------------------
+    // 4.5. Render Live Players Table View
+    // ----------------------------------------------------------------------
+    function renderLivePlayersTable() {
+        if (!liveTableBody) return;
+        liveTableBody.innerHTML = '';
+
+        const searchVal = (searchInput ? searchInput.value : '').toLowerCase().trim();
+        const selectedDept = deptFilter ? deptFilter.value : 'ALL';
+        const selectedYear = yearFilter ? yearFilter.value : 'ALL';
+
+        const deduped = deduplicatePlayers(playersList);
+        const livePlayers = deduped.filter(item => isPlayerLiveInGame(item));
+
+        const filtered = livePlayers.filter(item => {
+            const nameMatch = !searchVal || 
+                (item.name || '').toLowerCase().includes(searchVal) ||
+                (item.rollNumber || '').toLowerCase().includes(searchVal);
+
+            const deptMatch = selectedDept === 'ALL' || item.department === selectedDept;
+            const yearMatch = selectedYear === 'ALL' || item.year === selectedYear;
+
+            return nameMatch && deptMatch && yearMatch;
+        });
+
+        if (filtered.length === 0) {
+            liveTableBody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">
+                        <div style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">No Active Live Players</div>
+                        <div>Players currently playing in <code>game.html</code> will appear here automatically in real time.</div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        filtered.forEach((item) => {
+            const tr = document.createElement('tr');
+            const deptDisplay  = item.department ? item.department.replace('Department of ', '') : '—';
+            const rollDisplay  = item.rollNumber || '—';
+            const yearDisplay  = item.year || '—';
+            const phoneDisplay = item.phoneNumber || '—';
+            const statusHtml   = getStatusBadgeHtml(true);
+            const levelHtml    = getLevelBadgeHtml(item.currentLevel, item.levelTitle);
+            const roundScore   = item.score || 0;
+            const totalScore   = item.cumulativeScore || item.score || 0;
+
+            tr.innerHTML = `
+                <td>${statusHtml}</td>
+                <td><strong class="gold-text">${escapeHtml(rollDisplay)}</strong></td>
+                <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
+                <td>${escapeHtml(deptDisplay)}</td>
+                <td><span class="diff-chip diff-medium">${escapeHtml(yearDisplay)}</span></td>
+                <td>${levelHtml}</td>
+                <td><strong class="gold-text">${roundScore}</strong></td>
+                <td><span class="cum-score">${totalScore}</span></td>
+                <td><a href="tel:${escapeHtml(phoneDisplay)}" style="color: var(--accent-gold-light); font-weight: 600; text-decoration: none;">${escapeHtml(phoneDisplay)}</a></td>
+                <td style="text-align: right;">
+                    <button class="glass-btn btn-sm btn-secondary btn-spectate-grid" data-id="${item.id}" title="Inspect Live Grid">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <span>Live Grid</span>
+                    </button>
+                </td>
+            `;
+            liveTableBody.appendChild(tr);
+        });
+
+        // Event Handlers for spectating live player grid
+        liveTableBody.querySelectorAll('.btn-spectate-grid').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                const player = deduped.find(p => p.id === id);
+                if (player) openSpectatorModal(player);
+            });
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // 4.6. Live Grid Spectator Mode Modal Logic
+    // ----------------------------------------------------------------------
+    let spectatorUnsubscribe = null;
+    let activeSpectatePlayerId = null;
+
+    const modalLiveGrid      = document.getElementById('modal-live-grid');
+    const closeSpectateBtn   = document.getElementById('close-spectate-modal');
+    const spectateNameEl     = document.getElementById('spectate-player-name');
+    const spectateSubEl      = document.getElementById('spectate-player-sub');
+    const spectateLevelEl    = document.getElementById('spectate-level-val');
+    const spectateScoreEl    = document.getElementById('spectate-score-val');
+    const spectateTotalEl    = document.getElementById('spectate-total-val');
+    const spectateFoundEl    = document.getElementById('spectate-found-val');
+    const spectateGridMatrix = document.getElementById('spectate-grid-matrix');
+    const spectateWordsList  = document.getElementById('spectate-words-list');
+
+    function openSpectatorModal(player) {
+        if (!player || !player.id) return;
+        activeSpectatePlayerId = player.id;
+
+        if (spectateNameEl) spectateNameEl.textContent = player.name || 'Anonymous Player';
+        if (spectateSubEl)  spectateSubEl.textContent  = `Roll: ${player.rollNumber || '—'} • Dept: ${(player.department || '—').replace('Department of ', '')} • Year: ${player.year || '—'}`;
+        
+        if (modalLiveGrid) modalLiveGrid.classList.remove('hidden');
+
+        // Close any previous listener
+        if (spectatorUnsubscribe) {
+            spectatorUnsubscribe();
+            spectatorUnsubscribe = null;
+        }
+
+        // Subscribe real-time
+        if (window.WordQuestFirebase && window.WordQuestFirebase.subscribeToPlayerLiveGrid) {
+            spectatorUnsubscribe = window.WordQuestFirebase.subscribeToPlayerLiveGrid(player.id, (liveDoc) => {
+                renderSpectatorGrid(liveDoc);
+            });
+        } else {
+            renderSpectatorGrid(player);
+        }
+    }
+
+    function closeSpectatorModal() {
+        if (modalLiveGrid) modalLiveGrid.classList.add('hidden');
+        if (spectatorUnsubscribe) {
+            spectatorUnsubscribe();
+            spectatorUnsubscribe = null;
+        }
+        activeSpectatePlayerId = null;
+    }
+
+    if (closeSpectateBtn) closeSpectateBtn.addEventListener('click', closeSpectatorModal);
+    if (modalLiveGrid) {
+        modalLiveGrid.addEventListener('click', (e) => {
+            if (e.target === modalLiveGrid) closeSpectatorModal();
+        });
+    }
+
+    function renderSpectatorGrid(playerData) {
+        if (!playerData) return;
+        const liveState = playerData.liveState || {};
+        const grid = liveState.grid || [];
+        const words = liveState.words || [];
+        const placed = liveState.placed || {};
+        const foundWords = new Set(liveState.foundWords || []);
+        const gridSize = liveState.gridSize || (grid.length || 12);
+        const levelNum = liveState.level || playerData.currentLevel || 1;
+        const levelTitle = liveState.levelTitle || playerData.levelTitle || 'Novice';
+        const roundScore = typeof liveState.score === 'number' ? liveState.score : (playerData.score || 0);
+        const totalScore = typeof liveState.cumulativeScore === 'number' ? liveState.cumulativeScore : (playerData.cumulativeScore || roundScore);
+
+        if (spectateLevelEl) spectateLevelEl.textContent = `Lvl ${levelNum} (${levelTitle})`;
+        if (spectateScoreEl) spectateScoreEl.textContent = roundScore;
+        if (spectateTotalEl) spectateTotalEl.textContent = totalScore;
+        if (spectateFoundEl) spectateFoundEl.textContent = `${foundWords.size} / ${words.length}`;
+
+        // Build set of cell coordinates (r, c) that belong to found words
+        const foundCells = new Set();
+        foundWords.forEach(word => {
+            const cells = placed[word] || [];
+            cells.forEach(({ r, c }) => {
+                foundCells.add(`${r},${c}`);
+            });
+        });
+
+        // Render Grid Matrix
+        if (spectateGridMatrix) {
+            spectateGridMatrix.style.gridTemplateColumns = `repeat(${gridSize}, 32px)`;
+            spectateGridMatrix.innerHTML = '';
+
+            if (!grid || grid.length === 0) {
+                spectateGridMatrix.innerHTML = '<div style="color: var(--text-secondary); padding: 1.5rem; text-align: center;">Waiting for player to initialize puzzle grid...</div>';
+            } else {
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize; c++) {
+                        const cellEl = document.createElement('div');
+                        cellEl.className = 'spectate-cell';
+                        const letter = (grid[r] && grid[r][c]) ? grid[r][c] : ' ';
+                        cellEl.textContent = letter;
+                        if (foundCells.has(`${r},${c}`)) {
+                            cellEl.classList.add('spectate-cell-found');
+                        }
+                        spectateGridMatrix.appendChild(cellEl);
+                    }
+                }
+            }
+        }
+
+        // Render Words Sidebar Checklist
+        if (spectateWordsList) {
+            spectateWordsList.innerHTML = '';
+            if (words.length === 0) {
+                spectateWordsList.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.8rem;">No target words found</div>';
+            } else {
+                words.forEach(word => {
+                    const isFound = foundWords.has(word);
+                    const itemEl = document.createElement('div');
+                    itemEl.className = `spectate-word-item ${isFound ? 'spectate-word-found' : ''}`;
+                    itemEl.innerHTML = `
+                        <span>${escapeHtml(word)}</span>
+                        <span>${isFound ? '✓' : '—'}</span>
+                    `;
+                    spectateWordsList.appendChild(itemEl);
+                });
+            }
+        }
     }
 
     // ----------------------------------------------------------------------
@@ -313,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!firebaseReady) {
             leaderboardTableBody.innerHTML = `
                 <tr>
-                    <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                    <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
                         Loading leaderboard from server...
                     </td>
                 </tr>
@@ -324,7 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filtered.length === 0) {
             leaderboardTableBody.innerHTML = `
                 <tr>
-                    <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                    <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
                         No leaderboard entries match the current filter criteria.
                     </td>
                 </tr>
@@ -346,12 +584,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateDisplay = item.date || new Date().toLocaleDateString();
             const cumScore = item.cumulativeScore || item.score || 0;
 
+            // Cross-reference player registered level if available
+            const playerDoc = playersList.find(p => p.rollNumber && p.rollNumber === item.rollNumber) || {};
+            const lvlNum = item.currentLevel || playerDoc.currentLevel || 1;
+            const lvlTitle = item.levelTitle || playerDoc.levelTitle || 'Novice';
+            const levelHtml = getLevelBadgeHtml(lvlNum, lvlTitle);
+
             tr.innerHTML = `
                 <td><strong>${rankBadge}</strong></td>
                 <td><strong class="gold-text">${escapeHtml(rollDisplay)}</strong></td>
                 <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
                 <td>${escapeHtml(deptDisplay)}</td>
                 <td><span class="diff-chip diff-medium">${escapeHtml(yearDisplay)}</span></td>
+                <td>${levelHtml}</td>
                 <td><strong class="gold-text">${item.score || 0}</strong></td>
                 <td><span class="cum-score">${cumScore}</span></td>
                 <td>${escapeHtml(dateDisplay)}</td>
@@ -399,6 +644,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCurrentTab() {
         if (currentTab === 'players') {
             renderPlayersTable();
+        } else if (currentTab === 'live') {
+            renderLivePlayersTable();
         } else {
             renderLeaderboardTable();
         }
@@ -487,37 +734,63 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('No registered players to export.');
                 return;
             }
-            csvContent += 'Roll Number,Player Name,Phone Number,Department,Year of Study,Registered Date\n';
+            csvContent += 'Roll Number,Player Name,Status,Current Level,Level Title,Phone Number,Department,Year of Study,Registered Date\n';
             playersList.forEach(p => {
-                const roll  = `"${(p.rollNumber   || '').replace(/"/g, '""')}"`;
-                const name  = `"${(p.name         || '').replace(/"/g, '""')}"`;
-                const phone = `"${(p.phoneNumber  || '').replace(/"/g, '""')}"`;
-                const dept  = `"${(p.department   || '').replace(/"/g, '""')}"`;
-                const year  = `"${(p.year         || '').replace(/"/g, '""')}"`;
-                const date  = `"${(p.dateDisplay  || '').replace(/"/g, '""')}"`;
-                csvContent += `${roll},${name},${phone},${dept},${year},${date}\n`;
+                const roll   = `"${(p.rollNumber   || '').replace(/"/g, '""')}"`;
+                const name   = `"${(p.name         || '').replace(/"/g, '""')}"`;
+                const status = `"${p.active === true ? 'LIVE' : 'Offline'}"`;
+                const lvl    = `"${p.currentLevel   || 1}"`;
+                const title  = `"${(p.levelTitle   || 'Novice').replace(/"/g, '""')}"`;
+                const phone  = `"${(p.phoneNumber  || '').replace(/"/g, '""')}"`;
+                const dept   = `"${(p.department   || '').replace(/"/g, '""')}"`;
+                const year   = `"${(p.year         || '').replace(/"/g, '""')}"`;
+                const date   = `"${(p.dateDisplay  || '').replace(/"/g, '""')}"`;
+                csvContent += `${roll},${name},${status},${lvl},${title},${phone},${dept},${year},${date}\n`;
+            });
+        } else if (currentTab === 'live') {
+            const livePlayers = deduplicatePlayers(playersList).filter(p => p.active === true);
+            if (livePlayers.length === 0) {
+                alert('No live players currently online to export.');
+                return;
+            }
+            csvContent += 'Roll Number,Player Name,Status,Current Level,Level Title,Round Score,Total Score,Department,Year of Study,Phone Number\n';
+            livePlayers.forEach(p => {
+                const roll   = `"${(p.rollNumber   || '').replace(/"/g, '""')}"`;
+                const name   = `"${(p.name         || '').replace(/"/g, '""')}"`;
+                const status = `"LIVE NOW"`;
+                const lvl    = `"${p.currentLevel   || 1}"`;
+                const title  = `"${(p.levelTitle   || 'Novice').replace(/"/g, '""')}"`;
+                const rScore = p.score || 0;
+                const tScore = p.cumulativeScore || p.score || 0;
+                const dept   = `"${(p.department   || '').replace(/"/g, '""')}"`;
+                const year   = `"${(p.year         || '').replace(/"/g, '""')}"`;
+                const phone  = `"${(p.phoneNumber  || '').replace(/"/g, '""')}"`;
+                csvContent += `${roll},${name},${status},${lvl},${title},${rScore},${tScore},${dept},${year},${phone}\n`;
             });
         } else {
             if (leaderboardList.length === 0) {
                 alert('No leaderboard records to export.');
                 return;
             }
-            csvContent += 'Rank,Roll Number,Player Name,Department,Year of Study,Score,Date\n';
+            csvContent += 'Rank,Roll Number,Player Name,Department,Year of Study,Level Reached,Score,Total Score,Date\n';
             leaderboardList.forEach((r, idx) => {
+                const playerDoc = playersList.find(p => p.rollNumber && p.rollNumber === r.rollNumber) || {};
                 const roll  = `"${(r.rollNumber || '').replace(/"/g, '""')}"`;
                 const name  = `"${(r.name || '').replace(/"/g, '""')}"`;
                 const dept  = `"${(r.department || '').replace(/"/g, '""')}"`;
                 const year  = `"${(r.year || '').replace(/"/g, '""')}"`;
+                const lvl   = `"${r.currentLevel || playerDoc.currentLevel || 1} (${r.levelTitle || playerDoc.levelTitle || 'Novice'})"`;
                 const score = r.score || 0;
+                const total = r.cumulativeScore || r.score || 0;
                 const date  = `"${(r.date || '').replace(/"/g, '""')}"`;
-                csvContent += `${idx + 1},${roll},${name},${dept},${year},${score},${date}\n`;
+                csvContent += `${idx + 1},${roll},${name},${dept},${year},${lvl},${score},${total},${date}\n`;
             });
         }
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `WordQuest_${currentTab === 'players' ? 'Registered_Players' : 'Leaderboard'}_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute('download', `WordQuest_${currentTab.toUpperCase()}_PLAYERS_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

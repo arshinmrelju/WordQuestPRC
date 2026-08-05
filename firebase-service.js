@@ -219,6 +219,7 @@ export async function registerPlayer(playerData) {
             department:  department             || "",
             year:        year                   || "",
             rollNumber:  rollNumber             || "",
+            active:      false,
             registeredAt: serverTimestamp()
         }, { merge: true });
         console.log("Player registered with ID:", docId);
@@ -258,22 +259,108 @@ export async function getPlayerByRollNumber(rollNumber, department, year) {
 }
 
 /**
- * Mark the player's document as active (game started)
+ * Mark the player's document as active (game started) with level and score tracking
  * Reads the player's Firestore doc ID from localStorage.
+ * @param {Object} levelData Optional { level, levelTitle, score, cumulativeScore }
  */
-export async function registerActiveGame() {
+export async function registerActiveGame(levelData = {}) {
     const playerId = localStorage.getItem('wordQuest_playerFirestoreId');
     if (!playerId) return null;
     try {
-        await updateDoc(doc(db, "players", playerId), {
+        const payload = {
             active: true,
-            gameStartedAt: serverTimestamp()
-        });
-        console.log("Player marked active:", playerId);
+            gameStartedAt: serverTimestamp(),
+            lastActiveAt: serverTimestamp()
+        };
+        if (levelData && typeof levelData.level === 'number') {
+            payload.currentLevel = levelData.level;
+            payload.levelTitle = levelData.levelTitle || 'Novice';
+            payload.score = levelData.score || 0;
+            payload.cumulativeScore = levelData.cumulativeScore || 0;
+        }
+        await updateDoc(doc(db, "players", playerId), payload);
+        console.log("Player marked active:", playerId, levelData);
         return playerId;
     } catch (e) {
         console.warn("Failed to mark player active:", e);
         return null;
+    }
+}
+
+/**
+ * Update the player's level progress in Firestore in real-time
+ * @param {Object} levelData { level, levelTitle, score, cumulativeScore }
+ */
+export async function updatePlayerLevelInFirestore(levelData = {}) {
+    const playerId = localStorage.getItem('wordQuest_playerFirestoreId');
+    if (!playerId) return null;
+    try {
+        const { level = 1, levelTitle = 'Novice', score = 0, cumulativeScore = 0 } = levelData;
+        await updateDoc(doc(db, "players", playerId), {
+            active: true,
+            currentLevel: level,
+            levelTitle: levelTitle,
+            score: score,
+            cumulativeScore: cumulativeScore,
+            lastActiveAt: serverTimestamp()
+        });
+        console.log("Updated player level in Firestore:", playerId, "Lvl:", level, levelTitle);
+        return playerId;
+    } catch (e) {
+        console.warn("Failed to update player level in Firestore:", e);
+        return null;
+    }
+}
+
+/**
+ * Sync the player's active 2D grid matrix, target words, and found words to Firestore for live spectating
+ * @param {Object} gridData { grid, words, placed, foundWords, gridSize, remainingSeconds, score, level, levelTitle }
+ */
+export async function syncLiveGridToFirestore(gridData = {}) {
+    const playerId = localStorage.getItem('wordQuest_playerFirestoreId');
+    if (!playerId || !gridData) return null;
+    try {
+        const { grid, words, placed, foundWords, gridSize, remainingSeconds, score, level, levelTitle } = gridData;
+        await updateDoc(doc(db, "players", playerId), {
+            liveState: {
+                grid: grid || [],
+                words: words || [],
+                placed: placed || {},
+                foundWords: foundWords || [],
+                gridSize: gridSize || 12,
+                remainingSeconds: typeof remainingSeconds === 'number' ? remainingSeconds : null,
+                score: score || 0,
+                level: level || 1,
+                levelTitle: levelTitle || 'Novice',
+                updatedAt: serverTimestamp()
+            }
+        });
+        console.log("Live grid synced to Firestore for player:", playerId);
+        return playerId;
+    } catch (e) {
+        console.warn("Failed to sync live grid to Firestore:", e);
+        return null;
+    }
+}
+
+/**
+ * Subscribe to a specific live player's Firestore document (for real-time spectator mode)
+ * @param {string} playerId 
+ * @param {Function} callback 
+ */
+export function subscribeToPlayerLiveGrid(playerId, callback) {
+    if (!playerId) return () => {};
+    try {
+        return onSnapshot(doc(db, "players", playerId), (docSnap) => {
+            if (docSnap.exists()) {
+                callback({ id: docSnap.id, ...docSnap.data() });
+            }
+        }, (error) => {
+            console.warn("Spectator snapshot error for player:", playerId, error);
+        });
+    } catch (e) {
+        console.warn("subscribeToPlayerLiveGrid error:", e);
+        return () => {};
     }
 }
 
@@ -286,7 +373,7 @@ export async function unregisterActiveGame() {
     try {
         await updateDoc(doc(db, "players", playerId), {
             active: false,
-            gameStartedAt: null
+            liveState: null
         });
         console.log("Player marked inactive:", playerId);
     } catch (e) {
@@ -295,14 +382,20 @@ export async function unregisterActiveGame() {
 }
 
 /**
- * Subscribe to the count of active players
+ * Subscribe to the count of players actively playing in game.html
+ * (active === true AND have a valid liveState grid — excludes index.html / idle sessions)
  * @param {Function} callback Called with the live count (number)
  */
 export function subscribeToActiveGameCount(callback) {
     try {
         const q = query(collection(db, "players"), where("active", "==", true));
         return onSnapshot(q, (snapshot) => {
-            callback(snapshot.size);
+            // Strictly count only players with an actual puzzle grid loaded (i.e. inside game.html)
+            const liveInGame = snapshot.docs.filter(d => {
+                const data = d.data();
+                return data.liveState && Array.isArray(data.liveState.grid) && data.liveState.grid.length > 0;
+            });
+            callback(liveInGame.length);
         }, (error) => {
             console.warn("Active players snapshot error:", error);
         });
@@ -480,6 +573,9 @@ window.WordQuestFirebase = {
     subscribeToPlayers,
     deletePlayerFromFirestore,
     registerActiveGame,
+    updatePlayerLevelInFirestore,
+    syncLiveGridToFirestore,
+    subscribeToPlayerLiveGrid,
     unregisterActiveGame,
     subscribeToActiveGameCount,
     saveCumulativeScoreToFirestore,

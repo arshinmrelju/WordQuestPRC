@@ -429,10 +429,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 12. Boot
-    // ------------------------------------------------------------------
+    // Ensure player is marked inactive while on index.html (not in game.html)
+    function clearIndexActiveState(retries = 20) {
+        if (window.WordQuestFirebase && window.WordQuestFirebase.unregisterActiveGame) {
+            window.WordQuestFirebase.unregisterActiveGame();
+        } else if (retries > 0) {
+            setTimeout(() => clearIndexActiveState(retries - 1), 200);
+        }
+    }
+
     initFloatingLetters();
     restoreSession();
     renderLeaderboard();
+    clearIndexActiveState();
 });
