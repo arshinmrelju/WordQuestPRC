@@ -47,6 +47,16 @@ const WORD_BANK = [
     'DECONSTRUCTION', 'EXISTENTIALISM', 'POSTMODERNISM', 'ROMANTICISM',
     'TRANSCENDENTALISM', 'METAFICTION', 'JUXTAPOSITION', 'PATHETICFALLACY',
     'SYNECDOCHE',
+    'ACRONYM', 'ACROSTIC', 'AFFIX', 'ANTITHESIS', 'ANTONYM',
+    'APOSTROPHE', 'BATHOS', 'CINQUAIN', 'DIPHTHONG', 'DISSONANCE',
+    'DRAMATIST', 'ELLIPSIS', 'EPIGRAM', 'EPITHET', 'EUPHONY',
+    'HUBRIS', 'INFINITIVE', 'INVERSION', 'LITOTES', 'METONYMY',
+    'MIDSUMMER', 'MODIFIER', 'MORPHEME', 'PARODY', 'PARTICIPLE',
+    'PASTORAL', 'PHILOLOGY', 'RHETORIC', 'SESTINA', 'SYNONYM',
+    'TERCET', 'TRANSITIVE', 'VILLANELLE', 'VOICE',
+    'BRONTE', 'CERVANTES', 'DANTE', 'FITZGERALD', 'HARDY',
+    'KAFKA', 'MELVILLE', 'STEINBECK', 'WHITMAN', 'YEATS',
+    'FAUST', 'GATSBY', 'GOTHIC', 'HEROIC', 'MOBYDICK', 'PRIDE', 'ROMEO',
 ];
 
 const GRID_SIZE  = 12;   // 12×12 grid
@@ -85,6 +95,7 @@ class WordSearch {
         this.foundWords = new Set(); // words found so far
         this.score      = 0;
         this.cumulativeScore = 0;
+        this.usedWords  = [];   // words already shown to this player (never reused)
 
         /* selection state */
         this.selecting  = false;
@@ -203,6 +214,7 @@ class WordSearch {
         // Rehydrate cumulative score / level from Firestore (source of truth across devices)
         await this._restoreProgressFromFirestore();
 
+        this._loadUsedWords();
         this._loadPlayerLevel();
         this._applyDifficulty();
         this._loadCumulativeScore();
@@ -239,6 +251,7 @@ class WordSearch {
         this.selStart   = null;
         this.selCells   = [];
 
+        this._loadUsedWords();
         this._loadPlayerLevel();
         this._applyDifficulty();
 
@@ -367,6 +380,40 @@ class WordSearch {
         return roll || 'anonymous';
     }
 
+    /* Words already shown to this player are persisted per player so they never
+       repeat across levels. Keyed by player so each player has their own history. */
+    _getUsedWordsKey() {
+        return 'wordQuest_usedWords_' + this._getPlayerKey();
+    }
+
+    _loadUsedWords() {
+        try {
+            const raw = localStorage.getItem(this._getUsedWordsKey());
+            const parsed = JSON.parse(raw || '[]');
+            this.usedWords = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            this.usedWords = [];
+        }
+    }
+
+    _saveUsedWords() {
+        try {
+            localStorage.setItem(this._getUsedWordsKey(), JSON.stringify(this.usedWords));
+        } catch (e) { /* noop */ }
+    }
+
+    _markWordsUsed(words) {
+        if (!Array.isArray(words)) return;
+        let changed = false;
+        for (const w of words) {
+            if (w && !this.usedWords.includes(w)) {
+                this.usedWords.push(w);
+                changed = true;
+            }
+        }
+        if (changed) this._saveUsedWords();
+    }
+
     /* Pull the player's cumulative score / level from Firestore at boot so a player
        who registered on another device doesn't start at zero. Falls back to 0 quietly. */
     async _restoreProgressFromFirestore() {
@@ -479,7 +526,12 @@ class WordSearch {
     _placeWords() {
         this.placed = {};
         const placedWords = [];
-        const pool = [...this.candidatePool].sort(() => Math.random() - 0.5);
+
+        // Exclude words already shown to this player in earlier rounds.
+        // If too few unused words remain, fall back to the full pool (reuse) so the game stays playable.
+        let unusedPool = this.candidatePool.filter(w => !this.usedWords.includes(w));
+        if (unusedPool.length < this.wordCount) unusedPool = [...this.candidatePool];
+        const pool = unusedPool.sort(() => Math.random() - 0.5);
 
         for (const word of pool) {
             if (placedWords.length >= this.wordCount) break;
@@ -490,7 +542,9 @@ class WordSearch {
 
         // If pool was exhausted before reaching this.wordCount, retry with default WORD_BANK fallback
         if (placedWords.length < this.wordCount) {
-            const fallbackPool = [...WORD_BANK].sort(() => Math.random() - 0.5);
+            let fallback = WORD_BANK.filter(w => !placedWords.includes(w) && !this.usedWords.includes(w));
+            if (fallback.length < this.wordCount) fallback = [...WORD_BANK]; // last resort — reuse
+            const fallbackPool = fallback.sort(() => Math.random() - 0.5);
             for (const word of fallbackPool) {
                 if (placedWords.length >= this.wordCount) break;
                 if (!placedWords.includes(word) && this._placeOne(word)) {
@@ -500,6 +554,7 @@ class WordSearch {
         }
 
         this.words = placedWords;
+        this._markWordsUsed(placedWords); // these words are now "shown" — never reuse for this player
     }
 
     _placeOne(word) {

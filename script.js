@@ -309,6 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.removeItem('wordQuest_cumulative_' + freshKey);
                     localStorage.removeItem('wordQuest_cumulative_' + roll);
                     localStorage.removeItem('wordQuest_history_' + roll);
+                    localStorage.removeItem('wordQuest_usedWords_' + freshKey);
                 } catch (e) { /* noop */ }
             };
 
