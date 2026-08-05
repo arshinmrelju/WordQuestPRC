@@ -409,7 +409,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             tbody.innerHTML = '';
-            list.slice(0, 10).forEach((item, index) => {
+            const total = (r) => Math.max(r.cumulativeScore || 0, r.score || 0);
+            list.slice().sort((a, b) => total(b) - total(a)).slice(0, 10).forEach((item, index) => {
                 const tr = document.createElement('tr');
                 let rank = `${index + 1}`;
                 if (index === 0) rank = '🥇';
@@ -420,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td><strong>${rank}</strong></td>
                     <td>${item.name}</td>
                     <td>${dept}</td>
-                    <td style="font-weight:700; color:var(--accent-gold-light);">${item.score}</td>
+                    <td style="font-weight:700; color:var(--accent-gold-light);">${total(item)}</td>
                 `;
                 tbody.appendChild(tr);
             });
