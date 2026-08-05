@@ -270,13 +270,13 @@ class WordSearch {
         this._startLiveHeartbeat();
     }
 
-    _syncLevelToFirestore() {
+    _syncLevelToFirestore(bankRound = true) {
         if (window.WordQuestFirebase && window.WordQuestFirebase.updatePlayerLevelInFirestore) {
             window.WordQuestFirebase.updatePlayerLevelInFirestore({
                 level: this.level,
                 levelTitle: this.levelTitle,
-                score: this.score,
-                cumulativeScore: this.cumulativeScore + this.score
+                score: bankRound ? this.score : 0,
+                cumulativeScore: bankRound ? (this.cumulativeScore + this.score) : this.cumulativeScore
             });
         }
     }
@@ -899,7 +899,7 @@ class WordSearch {
 
     _timeUp() {
         this._unregisterActiveGame();
-        this._saveScore();
+        this._clearRoundScore(); // round not cleared — the earned points are NOT banked
 
         // 1. Reveal answers on grid immediately
         this._revealAnswers();
@@ -916,7 +916,7 @@ class WordSearch {
             const unfoundCount = this.words.length - this.foundWords.size;
             const subEl = document.getElementById('end-sub');
             if (subEl) {
-                subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) revealed!' : ''} ⚠️ Level ${this.level} not cleared — find ALL words to advance!`;
+                subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) revealed!' : ''} ⚠️ Level ${this.level} not cleared — this round's score was NOT added to your total. Find ALL words to bank points & advance!`;
             }
             
             const numEl = document.getElementById('score-result-num');
@@ -1075,6 +1075,55 @@ class WordSearch {
 
         // 4. Save cumulative score to Firestore
         this._saveCumulativeToFirestore({ id: this._getPlayerKey(), name, rollNumber, department, year, cumulativeScore: this.cumulativeScore }, 5);
+    }
+
+    /* When a round is NOT cleared (time up), the points earned in that round are
+       wiped out — they are never banked into the cumulative total. The live
+       projections written during play are overwritten with the prior total. */
+    _clearRoundScore() {
+        const name       = localStorage.getItem('wordQuest_playerName')       || 'Player';
+        const rollNumber = localStorage.getItem('wordQuest_rollNumber')       || '';
+        const department = localStorage.getItem('wordQuest_department')        || '';
+        const year       = localStorage.getItem('wordQuest_yearOfStudy')       || '';
+
+        const today = new Date().toLocaleDateString();
+        const record = {
+            id: this._getPlayerKey(),
+            name, rollNumber, department, year,
+            score: 0,
+            cumulativeScore: this.cumulativeScore,
+            date: today
+        };
+
+        // 1. Revert local leaderboard cache to the prior total (drop this round's gain)
+        try {
+            const key  = 'wordQuest_leaderboard';
+            const list = JSON.parse(localStorage.getItem(key) || '[]');
+            const playerKey = this._getPlayerKey();
+            const idx = list.findIndex(r => (r.id === playerKey || (rollNumber && r.rollNumber === rollNumber)));
+            if (idx >= 0) {
+                list[idx] = { ...list[idx], ...record };
+            } else {
+                list.push(record);
+            }
+            list.sort((a, b) => Math.max(b.cumulativeScore || 0, b.score || 0) - Math.max(a.cumulativeScore || 0, a.score || 0));
+            localStorage.setItem(key, JSON.stringify(list.slice(0, 100)));
+        } catch { /* noop */ }
+
+        // 2. Overwrite Firestore leaderboard & cumulativeScores so failed-round gains are cleared
+        if (window.WordQuestFirebase && window.WordQuestFirebase.saveScoreToFirestore) {
+            window.WordQuestFirebase.saveScoreToFirestore(record).catch(() => {});
+        }
+        if (window.WordQuestFirebase && window.WordQuestFirebase.saveCumulativeScoreToFirestore) {
+            window.WordQuestFirebase.saveCumulativeScoreToFirestore({
+                id: this._getPlayerKey(),
+                name, rollNumber, department, year,
+                cumulativeScore: this.cumulativeScore
+            }).catch(() => {});
+        }
+
+        // 3. Sync players doc to the prior total (no round gain banked)
+        this._syncLevelToFirestore(false);
     }
 
     _saveToFirestore(record, attempts) {
