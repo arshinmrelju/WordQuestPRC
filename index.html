@@ -617,6 +617,37 @@
 
     </div>
 
+    <!-- ── WELCOME BACK MODAL (already-registered player) ── -->
+    <div id="welcome-back-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h2 class="modal-title" id="wb-modal-title">Welcome back!</h2>
+            <p class="modal-subtitle" id="wb-modal-subtitle">You're already registered as a player.</p>
+            <div class="modal-stats-grid">
+                <div class="modal-stat-card">
+                    <span class="mstat-label">Level</span>
+                    <span class="mstat-val" id="wb-modal-level">1</span>
+                </div>
+                <div class="modal-stat-card">
+                    <span class="mstat-label">Total Score</span>
+                    <span class="mstat-val" id="wb-modal-score">0</span>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="wb-continue-btn" class="glass-btn btn-primary">
+                    <span class="btn-text">Continue Quest</span>
+                    <span class="btn-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                        </svg>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Application Script -->
     <script src="script.js"></script>
 </body>

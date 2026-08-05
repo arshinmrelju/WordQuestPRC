@@ -94,6 +94,9 @@ class WordSearch {
         /* timer */
         this._remaining = GAME_SECS;
         this._timer     = null;
+
+        /* live sync heartbeat */
+        this._heartbeat = null;
     }
 
     /* ── PROGRESSIVE DIFFICULTY LEVELLING ───── */
@@ -187,7 +190,7 @@ class WordSearch {
     }
 
     /* ── BOOT ─────────────────────────────────── */
-    init() {
+    async init() {
         // Reset per-game state
         this.grid       = [];
         this.placed     = {};
@@ -196,6 +199,9 @@ class WordSearch {
         this.selecting  = false;
         this.selStart   = null;
         this.selCells   = [];
+
+        // Rehydrate cumulative score / level from Firestore (source of truth across devices)
+        await this._restoreProgressFromFirestore();
 
         this._loadPlayerLevel();
         this._applyDifficulty();
@@ -261,6 +267,7 @@ class WordSearch {
             });
         }
         this._syncLiveGrid();
+        this._startLiveHeartbeat();
     }
 
     _syncLevelToFirestore() {
@@ -291,8 +298,36 @@ class WordSearch {
     }
 
     _unregisterActiveGame() {
+        this._stopLiveHeartbeat();
         if (window.WordQuestFirebase && window.WordQuestFirebase.unregisterActiveGame) {
             window.WordQuestFirebase.unregisterActiveGame();
+        }
+    }
+
+    // Keep live grid / active status fresh so admins see the player as LIVE even while idle
+    _startLiveHeartbeat() {
+        this._stopLiveHeartbeat();
+        this._heartbeat = setInterval(() => {
+            if (window.WordQuestFirebase && window.WordQuestFirebase.syncLiveGridToFirestore) {
+                window.WordQuestFirebase.syncLiveGridToFirestore({
+                    grid: this.grid,
+                    words: this.words,
+                    placed: this.placed,
+                    foundWords: Array.from(this.foundWords),
+                    gridSize: this.gridSize,
+                    remainingSeconds: this._remaining,
+                    score: this.score,
+                    level: this.level,
+                    levelTitle: this.levelTitle
+                });
+            }
+        }, 15000);
+    }
+
+    _stopLiveHeartbeat() {
+        if (this._heartbeat) {
+            clearInterval(this._heartbeat);
+            this._heartbeat = null;
         }
     }
 
@@ -330,6 +365,52 @@ class WordSearch {
             return `${roll}|${dept}|${year}`;
         }
         return roll || 'anonymous';
+    }
+
+    /* Pull the player's cumulative score / level from Firestore at boot so a player
+       who registered on another device doesn't start at zero. Falls back to 0 quietly. */
+    async _restoreProgressFromFirestore() {
+        const roll = localStorage.getItem('wordQuest_rollNumber') || '';
+        const dept = localStorage.getItem('wordQuest_department') || '';
+        const year = localStorage.getItem('wordQuest_yearOfStudy') || '';
+        const fb = window.WordQuestFirebase;
+        if (!fb || !roll || !dept || !year) return;
+
+        // Guard against a hung Firestore request so the game never stalls on load
+        const timeout = new Promise((res) => setTimeout(() => res(null), 2500));
+
+        try {
+            // 1. Player doc — has currentLevel + cumulativeScore (may be stale/0)
+            if (fb.getPlayerByRollNumber) {
+                const lookup = fb.getPlayerByRollNumber(roll, dept, year).catch(() => null);
+                const player = await Promise.race([lookup, timeout]);
+                if (player) {
+                    const lvl = Number(player.currentLevel) || 1;
+                    if (lvl > 1) {
+                        this.level = lvl;
+                        localStorage.setItem('wordQuest_level_' + this._getPlayerKey(), String(lvl));
+                    }
+                    this._applyCumulativeScore(Number(player.cumulativeScore) || 0, roll);
+                }
+            }
+
+            // 2. cumulativeScores collection — authoritative running total (fallback if players doc was 0)
+            if (this.cumulativeScore <= 0 && fb.getCumulativeScoreFromFirestore) {
+                const lookup = fb.getCumulativeScoreFromFirestore(roll, dept, year).catch(() => 0);
+                const cum = await Promise.race([lookup, timeout]);
+                if (cum > 0) this._applyCumulativeScore(cum, roll);
+            }
+        } catch (e) { /* noop */ }
+    }
+
+    _applyCumulativeScore(cum, roll) {
+        if (!(cum > 0)) return;
+        this.cumulativeScore = cum;
+        const key = this._getPlayerKey();
+        try {
+            localStorage.setItem('wordQuest_cumulative_' + key, String(cum));
+            if (roll) localStorage.setItem('wordQuest_cumulative_' + roll, String(cum));
+        } catch (e) { /* noop */ }
     }
 
     _loadCumulativeScore() {
@@ -777,10 +858,13 @@ class WordSearch {
         const { totalBonus, timeBonus, speedTierBonus, tierName } = this._calculateSpeedBonus();
         this.score += totalBonus;
         this._updateHUD();
-        this._saveScore();
-        
+
+        // Push level + projected cumulative (previous total + this round) to the players doc
+        // BEFORE the round is committed, so the cumulative is never double-counted.
         const clearedLevel = this.level;
-        this._incrementPlayerLevel(); // ⚡ Advance level for next round (this.level is now next level)
+        this._incrementPlayerLevel();
+
+        this._saveScore(); // commits cumulative: cumulativeScore += score (localStorage + Firestore)
 
         const emojiEl = document.getElementById('end-emoji');
         if (emojiEl) emojiEl.textContent = '🏆';
@@ -817,9 +901,6 @@ class WordSearch {
         this._unregisterActiveGame();
         this._saveScore();
 
-        const clearedLevel = this.level;
-        this._incrementPlayerLevel(); // ⚡ Advance level for next round
-
         // 1. Reveal answers on grid immediately
         this._revealAnswers();
         this._toast('⏰ Time Up! Revealing missed answers...', 1500);
@@ -830,12 +911,12 @@ class WordSearch {
             if (emojiEl) emojiEl.textContent = '⏰';
             
             const titleEl = document.getElementById('end-title');
-            if (titleEl) titleEl.textContent = `Level ${clearedLevel} Time's Up!`;
+            if (titleEl) titleEl.textContent = `Level ${this.level} Time's Up!`;
             
             const unfoundCount = this.words.length - this.foundWords.size;
             const subEl = document.getElementById('end-sub');
             if (subEl) {
-                subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) revealed!' : ''} 🔥 Next round will be Level ${this.level}!`;
+                subEl.textContent = `Found ${this.foundWords.size} of ${this.words.length} words. ${unfoundCount > 0 ? unfoundCount + ' missed word(s) revealed!' : ''} ⚠️ Level ${this.level} not cleared — find ALL words to advance!`;
             }
             
             const numEl = document.getElementById('score-result-num');

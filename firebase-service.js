@@ -153,6 +153,29 @@ export async function saveCumulativeScoreToFirestore(data) {
 }
 
 /**
+ * Read the player's true cumulative score from the cumulativeScores collection
+ * (the authoritative running total across all devices), or 0 if not found.
+ * @param {string} rollNumber
+ * @param {string} department
+ * @param {string} year
+ */
+export async function getCumulativeScoreFromFirestore(rollNumber, department, year) {
+    if (!rollNumber || !department || !year) return 0;
+    try {
+        const docRef = doc(db, "cumulativeScores", `${rollNumber}|${department}|${year}`);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            const d = snap.data();
+            return Number(d.cumulativeScore) || 0;
+        }
+        return 0;
+    } catch (e) {
+        console.warn("Firestore getCumulativeScore error:", e);
+        return 0;
+    }
+}
+
+/**
  * Save Custom Word Bank to Firestore
  * @param {Array} words Array of string words
  */
@@ -321,9 +344,13 @@ export async function syncLiveGridToFirestore(gridData = {}) {
     if (!playerId || !gridData) return null;
     try {
         const { grid, words, placed, foundWords, gridSize, remainingSeconds, score, level, levelTitle } = gridData;
+        // Firestore cannot store nested arrays (2D grids), so flatten each row into a string.
+        const gridRows = Array.isArray(grid)
+            ? grid.map(row => (Array.isArray(row) ? row.join('') : String(row ?? '')))
+            : [];
         await updateDoc(doc(db, "players", playerId), {
             liveState: {
-                grid: grid || [],
+                grid: gridRows,
                 words: words || [],
                 placed: placed || {},
                 foundWords: foundWords || [],
@@ -579,6 +606,7 @@ window.WordQuestFirebase = {
     unregisterActiveGame,
     subscribeToActiveGameCount,
     saveCumulativeScoreToFirestore,
+    getCumulativeScoreFromFirestore,
     setGameStateInFirestore,
     getGameStateFromFirestore,
     subscribeToGameState,

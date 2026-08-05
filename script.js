@@ -297,11 +297,44 @@ document.addEventListener('DOMContentLoaded', () => {
             if (startBtn) {
                 startBtn.disabled = true;
                 const t = startBtn.querySelector('.btn-text');
-                if (t) t.textContent = 'Registering...';
+                if (t) t.textContent = 'Checking...';
             }
 
-            // Register in Firebase (non-blocking — we navigate regardless)
-            waitForFirebase((fb) => {
+            // Fresh registration — reset stale progression left by a previous player on this device
+            // so a genuinely new player always starts at Level 1 / zero cumulative score.
+            const resetFreshProgression = () => {
+                try {
+                    const freshKey = `${roll}|${dept}|${year}`;
+                    localStorage.removeItem('wordQuest_level_' + freshKey);
+                    localStorage.removeItem('wordQuest_cumulative_' + freshKey);
+                    localStorage.removeItem('wordQuest_cumulative_' + roll);
+                    localStorage.removeItem('wordQuest_history_' + roll);
+                } catch (e) { /* noop */ }
+            };
+
+            waitForFirebase(async (fb) => {
+                // If this roll + dept + year is already registered, log into the existing account
+                // instead of wiping their progress with a fresh registration.
+                if (fb && fb.getPlayerByRollNumber) {
+                    try {
+                        const existing = await fb.getPlayerByRollNumber(roll, dept, year);
+                        if (existing) {
+                            saveToStorage(
+                                existing.name || name,
+                                roll, dept, year,
+                                existing.phoneNumber || phone
+                            );
+                            localStorage.setItem(KEY_PLAYER_ID, existing.id);
+                            showWelcomeBackModal(existing);
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn('Existing-player lookup error:', e);
+                    }
+                }
+
+                // Fresh registration (also the Firebase-unavailable / lookup-error fallback)
+                resetFreshProgression();
                 const doRegister = fb && fb.registerPlayer
                     ? fb.registerPlayer({ name, phoneNumber: phone, rollNumber: roll, department: dept, year })
                     : Promise.resolve(null);
@@ -397,26 +430,68 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ------------------------------------------------------------------
-    // 11. Leaderboard rendering
+    // 10b. Welcome Back modal — shown when "Begin Quest" finds an existing player
     // ------------------------------------------------------------------
-    function renderLeaderboard() {
+    function showWelcomeBackModal(player) {
+        const modal   = document.getElementById('welcome-back-modal');
+        const contBtn = document.getElementById('wb-continue-btn');
+        if (!modal || !contBtn) { launchGame(null); return; }
+
+        const wbName  = document.getElementById('wb-modal-subtitle');
+        const wbLevel = document.getElementById('wb-modal-level');
+        const wbScore = document.getElementById('wb-modal-score');
+
+        if (wbName)  wbName.textContent  = 'You\'re already registered as ' + (player.name || 'Player') + '.';
+        if (wbLevel) wbLevel.textContent = player.currentLevel || 1;
+        if (wbScore) wbScore.textContent = player.cumulativeScore || 0;
+
+        // Reset the disabled button label while the modal is open
+        if (startBtn) {
+            const t = startBtn.querySelector('.btn-text');
+            if (t) t.textContent = 'Begin Quest';
+        }
+
+        modal.classList.remove('hidden');
+
+        contBtn.disabled = false;
+        const onContinue = () => {
+            contBtn.removeEventListener('click', onContinue);
+            modal.classList.add('hidden');
+            launchGame(null);
+        };
+        contBtn.addEventListener('click', onContinue);
+    }
+
+    // ------------------------------------------------------------------
+    // 11. Leaderboard rendering (live from Firestore, fallback to localStorage)
+    // ------------------------------------------------------------------
+    function renderLeaderboardRows(list) {
         const tbody = document.getElementById('lb-body');
         if (!tbody) return;
         try {
-            const list = JSON.parse(localStorage.getItem('wordQuest_leaderboard') || '[]');
-            if (list.length === 0) {
+            const arr = (list && Array.isArray(list)) ? list : JSON.parse(localStorage.getItem('wordQuest_leaderboard') || '[]');
+            if (arr.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; opacity:0.6; padding:1rem;">No scores yet! Be the first to play.</td></tr>';
                 return;
             }
+            const total = (r) => Math.max(Number(r.cumulativeScore) || 0, Number(r.score) || 0);
+            const seen = new Set();
+            const deduped = [];
+            arr.forEach((item) => {
+                const key = item.id || item.rollNumber || null;
+                if (key !== null && seen.has(key)) return;
+                if (key !== null) seen.add(key);
+                deduped.push(item);
+            });
+            deduped.sort((a, b) => total(b) - total(a));
             tbody.innerHTML = '';
-            const total = (r) => Math.max(r.cumulativeScore || 0, r.score || 0);
-            list.slice().sort((a, b) => total(b) - total(a)).slice(0, 10).forEach((item, index) => {
+            deduped.slice(0, 10).forEach((item, index) => {
                 const tr = document.createElement('tr');
                 let rank = `${index + 1}`;
                 if (index === 0) rank = '🥇';
                 else if (index === 1) rank = '🥈';
                 else if (index === 2) rank = '🥉';
-                const dept = item.department ? item.department.replace('Department of ', '') : '';
+                const dept = item.department ? String(item.department).replace('Department of ', '') : '';
                 tr.innerHTML = `
                     <td><strong>${rank}</strong></td>
                     <td>${item.name}</td>
@@ -427,6 +502,24 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; opacity:0.6; padding:1rem;">Could not load leaderboard.</td></tr>';
+        }
+    }
+
+    function subscribeLeaderboard() {
+        const trySubscribe = (fb) => {
+            if (fb && fb.subscribeToLeaderboard) {
+                const unsub = fb.subscribeToLeaderboard((list) => {
+                    if (Array.isArray(list)) renderLeaderboardRows(list);
+                });
+                // Kick a localStorage render so the table is never blank while Firestore loads
+                renderLeaderboardRows();
+                return unsub;
+            }
+            return null;
+        };
+        const immediate = trySubscribe(window.WordQuestFirebase);
+        if (!immediate) {
+            waitForFirebase(trySubscribe);
         }
     }
 
@@ -441,6 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initFloatingLetters();
     restoreSession();
-    renderLeaderboard();
+    renderLeaderboardRows();
+    subscribeLeaderboard();
     clearIndexActiveState();
 });

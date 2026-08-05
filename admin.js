@@ -238,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filtered.length === 0) {
             playersTableBody.innerHTML = `
                 <tr>
-                    <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                    <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
                         No registered players match the current criteria.
                     </td>
                 </tr>
@@ -255,12 +255,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const phoneDisplay = item.phoneNumber || '—';
             const statusHtml   = getStatusBadgeHtml(isPlayerLiveInGame(item));
             const levelHtml    = getLevelBadgeHtml(item.currentLevel, item.levelTitle);
+            const totalScore   = Math.max(Number(item.cumulativeScore) || 0, Number(item.score) || 0);
 
             tr.innerHTML = `
                 <td><strong class="gold-text">${escapeHtml(rollDisplay)}</strong></td>
                 <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
                 <td>${statusHtml}</td>
                 <td>${levelHtml}</td>
+                <td style="font-weight: 700; color: var(--accent-gold-light);">${totalScore}</td>
                 <td><a href="tel:${escapeHtml(phoneDisplay)}" style="color: var(--accent-gold-light); font-weight: 600; text-decoration: none;">${escapeHtml(phoneDisplay)}</a></td>
                 <td>${escapeHtml(deptDisplay)}</td>
                 <td><span class="diff-chip diff-medium">${escapeHtml(yearDisplay)}</span></td>
@@ -877,6 +879,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     playersList = deduplicatePlayers(list);
                     updateStats();
                     if (currentTab === 'players') renderPlayersTable();
+                    if (currentTab === 'live') renderLivePlayersTable();
                 }
             });
         }
