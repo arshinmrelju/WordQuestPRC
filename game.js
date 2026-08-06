@@ -245,6 +245,17 @@ class WordSearch {
         }
     }
 
+    /** Read the persisted level without overwriting this.level (for comparisons). */
+    _readLocalLevel() {
+        const key = this._getPlayerKey();
+        try {
+            const stored = localStorage.getItem('wordQuest_level_' + key);
+            return Math.max(1, parseInt(stored || '1', 10) || 1);
+        } catch (e) {
+            return 1;
+        }
+    }
+
     _incrementPlayerLevel() {
         const key = this._getPlayerKey();
         this.level += 1;
@@ -536,7 +547,10 @@ class WordSearch {
                 const player = await Promise.race([lookup, timeout]);
                 if (player) {
                     const lvl = Number(player.currentLevel) || 1;
-                    if (lvl > 1) {
+                    // Take the highest known level — a stale Firestore value must
+                    // never drag a player's locally-achieved progress backwards.
+                    const localLvl = this._readLocalLevel();
+                    if (lvl > 1 && lvl >= localLvl) {
                         this.level = lvl;
                         localStorage.setItem('wordQuest_level_' + this._getPlayerKey(), String(lvl));
                     }
