@@ -68,6 +68,39 @@
     color: var(--text-secondary);
 }
 
+/* Sound toggle button */
+.sound-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    background: rgba(15,23,42,0.05);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-full);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+.sound-toggle-btn:hover {
+    background: rgba(217,119,6,0.12);
+    border-color: var(--card-border-gold);
+    color: var(--accent-gold);
+}
+.sound-toggle-btn:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 2px;
+}
+.sound-toggle-btn .hidden {
+    display: none;
+}
+.sound-toggle-btn.muted {
+    background: rgba(239,68,68,0.1);
+    border-color: rgba(239,68,68,0.4);
+    color: #ef4444;
+}
+
 /* Logo in header */
 .game-header-logo {
     display: flex;
@@ -790,6 +823,10 @@
 
     .game-header-logo { order: 1; }
     .player-badge    { order: 2; }
+
+    /* Sound toggle is hidden on mobile (it clutters the small top bar);
+       audio can be managed from here before starting a round. */
+    .sound-toggle-btn { display: none; }
 
     .game-header-title {
         font-size: 0.95rem;

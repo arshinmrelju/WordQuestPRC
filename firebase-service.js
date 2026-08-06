@@ -410,17 +410,37 @@ export async function unregisterActiveGame() {
 
 /**
  * Subscribe to the count of players actively playing in game.html
- * (active === true AND have a valid liveState grid — excludes index.html / idle sessions)
+ * (active === true AND have a valid liveState grid AND a recent heartbeat —
+ * excludes index.html / idle sessions / players who closed their tab abruptly)
  * @param {Function} callback Called with the live count (number)
  */
+const LIVE_STALE_MS = 60000;
+
+function firestoreTimestampToMillis(ts) {
+    if (!ts) return null;
+    if (typeof ts.toMillis === 'function') return ts.toMillis();
+    if (ts instanceof Date) return ts.getTime();
+    if (typeof ts === 'number') return ts;
+    if (typeof ts === 'string') return Date.parse(ts);
+    return null;
+}
+
+function isLiveDocFresh(data) {
+    const liveState = data && data.liveState;
+    if (!liveState) return false;
+    const stamp = firestoreTimestampToMillis(liveState.updatedAt) || firestoreTimestampToMillis(data.lastActiveAt);
+    return stamp !== null && (Date.now() - stamp) < LIVE_STALE_MS;
+}
+
 export function subscribeToActiveGameCount(callback) {
     try {
         const q = query(collection(db, "players"), where("active", "==", true));
         return onSnapshot(q, (snapshot) => {
             // Strictly count only players with an actual puzzle grid loaded (i.e. inside game.html)
+            // who have reported in recently (heartbeat is every 15s).
             const liveInGame = snapshot.docs.filter(d => {
                 const data = d.data();
-                return data.liveState && Array.isArray(data.liveState.grid) && data.liveState.grid.length > 0;
+                return data.liveState && Array.isArray(data.liveState.grid) && data.liveState.grid.length > 0 && isLiveDocFresh(data);
             });
             callback(liveInGame.length);
         }, (error) => {
@@ -429,6 +449,34 @@ export function subscribeToActiveGameCount(callback) {
     } catch (e) {
         console.warn("subscribeToActiveGameCount error:", e);
     }
+}
+
+/**
+ * Automatically flip stale live-player docs to inactive.
+ * Players who closed game.html abruptly never fired the unload cleanup, so their
+ * doc stays active:true forever. This clears them server-side after LIVE_STALE_MS
+ * without a heartbeat, keeping the players collection tidy.
+ * @returns {Promise<number>} Number of docs cleaned up
+ */
+export async function cleanupStaleLivePlayers() {
+    let cleaned = 0;
+    try {
+        const q = query(collection(db, "players"), where("active", "==", true), limit(500));
+        const snap = await getDocs(q);
+        const batch = [];
+        snap.docs.forEach(d => {
+            const data = d.data();
+            if (data.liveState && Array.isArray(data.liveState.grid) && data.liveState.grid.length > 0 && !isLiveDocFresh(data)) {
+                batch.push(updateDoc(doc(db, "players", d.id), { active: false, liveState: null }));
+                cleaned++;
+            }
+        });
+        await Promise.allSettled(batch);
+        if (cleaned > 0) console.log("Cleaned stale live players:", cleaned);
+    } catch (e) {
+        console.warn("cleanupStaleLivePlayers error:", e);
+    }
+    return cleaned;
 }
 
 /**
@@ -605,6 +653,7 @@ window.WordQuestFirebase = {
     subscribeToPlayerLiveGrid,
     unregisterActiveGame,
     subscribeToActiveGameCount,
+    cleanupStaleLivePlayers,
     saveCumulativeScoreToFirestore,
     getCumulativeScoreFromFirestore,
     setGameStateInFirestore,

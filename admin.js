@@ -127,8 +127,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // A player is "live" only if they reported in recently.
+    // Heartbeat syncs every 15s, so a stale player who closed their tab abruptly
+    // (no reliable unload write) drops off after LIVE_STALE_MS without a Firestore write.
+    const LIVE_STALE_MS = 60000;
+
+    function tsToMillis(ts) {
+        if (!ts) return null;
+        if (typeof ts.toMillis === 'function') return ts.toMillis();
+        if (ts instanceof Date) return ts.getTime();
+        if (typeof ts === 'number') return ts;
+        if (typeof ts === 'string') return Date.parse(ts);
+        return null;
+    }
+
+    function isFreshLiveState(item) {
+        const liveState = item && item.liveState;
+        if (!liveState) return false;
+        const stamp = tsToMillis(liveState.updatedAt) || tsToMillis(item.lastActiveAt);
+        return stamp !== null && (Date.now() - stamp) < LIVE_STALE_MS;
+    }
+
     function isPlayerLiveInGame(item) {
-        return item && item.active === true && item.liveState && Array.isArray(item.liveState.grid) && item.liveState.grid.length > 0;
+        return item && item.active === true && item.liveState && Array.isArray(item.liveState.grid) && item.liveState.grid.length > 0 && isFreshLiveState(item);
     }
 
     function getStatusBadgeHtml(isActive) {
@@ -396,6 +417,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ----------------------------------------------------------------------
     let spectatorUnsubscribe = null;
     let activeSpectatePlayerId = null;
+    let spectatorTimerInterval = null;
+    let spectatorTimerTarget = null;
 
     const modalLiveGrid      = document.getElementById('modal-live-grid');
     const closeSpectateBtn   = document.getElementById('close-spectate-modal');
@@ -405,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const spectateScoreEl    = document.getElementById('spectate-score-val');
     const spectateTotalEl    = document.getElementById('spectate-total-val');
     const spectateFoundEl    = document.getElementById('spectate-found-val');
+    const spectateTimerEl    = document.getElementById('spectate-timer-val');
     const spectateGridMatrix = document.getElementById('spectate-grid-matrix');
     const spectateWordsList  = document.getElementById('spectate-words-list');
 
@@ -439,7 +463,55 @@ document.addEventListener('DOMContentLoaded', () => {
             spectatorUnsubscribe();
             spectatorUnsubscribe = null;
         }
+        stopSpectatorTimer();
         activeSpectatePlayerId = null;
+    }
+
+    // Recompute the absolute end time from the player's last synced remaining seconds + timestamp
+    function startSpectatorTimer(remainingSeconds, updatedAt) {
+        stopSpectatorTimer();
+        if (typeof remainingSeconds !== 'number') {
+            if (spectateTimerEl) spectateTimerEl.textContent = '--:--';
+            return;
+        }
+
+        let stampMs = null;
+        if (updatedAt && typeof updatedAt.toMillis === 'function') {
+            stampMs = updatedAt.toMillis();
+        } else if (updatedAt instanceof Date) {
+            stampMs = updatedAt.getTime();
+        } else if (typeof updatedAt === 'number') {
+            stampMs = updatedAt;
+        } else if (typeof updatedAt === 'string') {
+            stampMs = Date.parse(updatedAt);
+        }
+
+        spectatorTimerTarget = stampMs ? stampMs + remainingSeconds * 1000 : null;
+        updateSpectatorTimerTick();
+
+        if (spectatorTimerTarget) {
+            spectatorTimerInterval = setInterval(updateSpectatorTimerTick, 1000);
+        }
+    }
+
+    function stopSpectatorTimer() {
+        if (spectatorTimerInterval) {
+            clearInterval(spectatorTimerInterval);
+            spectatorTimerInterval = null;
+        }
+        spectatorTimerTarget = null;
+    }
+
+    function updateSpectatorTimerTick() {
+        if (!spectateTimerEl) return;
+        let remaining = 0;
+        if (spectatorTimerTarget) {
+            remaining = Math.max(0, Math.ceil((spectatorTimerTarget - Date.now()) / 1000));
+        }
+        const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+        const ss = String(remaining % 60).padStart(2, '0');
+        spectateTimerEl.textContent = `${mm}:${ss}`;
+        spectateTimerEl.classList.toggle('spectate-timer-danger', remaining <= 30);
     }
 
     if (closeSpectateBtn) closeSpectateBtn.addEventListener('click', closeSpectatorModal);
@@ -466,6 +538,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (spectateScoreEl) spectateScoreEl.textContent = roundScore;
         if (spectateTotalEl) spectateTotalEl.textContent = totalScore;
         if (spectateFoundEl) spectateFoundEl.textContent = `${foundWords.size} / ${words.length}`;
+
+        // Sync the live countdown from the player's latest synced remaining time.
+        // remainingSeconds is stamped at updatedAt, so derive the absolute end time
+        // and tick it down locally every second for a smooth spectator clock.
+        startSpectatorTimer(liveState.remainingSeconds, liveState.updatedAt);
 
         // Build set of cell coordinates (r, c) that belong to found words
         const foundCells = new Set();
@@ -945,6 +1022,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (liveEl) liveEl.textContent = count;
             });
         }
+
+        // 6. Re-evaluate staleness periodically so players who closed their tab
+        // abruptly (no reliable unload write) drop off the live views on their own.
+        // Firestore snapshots only fire when a doc CHANGES; a dead player's doc
+        // never changes, so a local timer re-checks the heartbeat timestamps and,
+        // if available, cleans them up server-side too.
+        setInterval(() => {
+            updateStats();
+            if (currentTab === 'live') renderLivePlayersTable();
+            if (currentTab === 'players') renderPlayersTable();
+            if (window.WordQuestFirebase && window.WordQuestFirebase.cleanupStaleLivePlayers) {
+                window.WordQuestFirebase.cleanupStaleLivePlayers().catch(() => {});
+            }
+        }, 15000);
         }); // end waitForFirebase
     }
 

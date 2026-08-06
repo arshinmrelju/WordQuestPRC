@@ -76,6 +76,130 @@ const DIRS = [
     [-1, -1], // diagonal up-left
 ];
 
+/* ─── AUDIO: WEB-AUDIO SYNTHESIZER ───────────── */
+/* Everything is synthesized live (zero asset files): a gentle ambient
+   background loop plus short one-shot effects for actions & outcomes. */
+class SoundFX {
+    constructor() {
+        this.ctx      = null;
+        this.master   = null;
+        this._unlocked = false;
+    }
+
+    /* Build context lazily (must happen after a user gesture on most browsers). */
+    _ensure() {
+        try {
+            if (this.ctx) return true;
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return false;
+            this.ctx    = new AC();
+            this.master = this.ctx.createGain();
+            this.master.gain.value = 0.9;
+            this.master.connect(this.ctx.destination);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /* Call from a user gesture to permit audio (autoplay policy). Never throws. */
+    unlock() {
+        try {
+            if (this._unlocked) { this._resume(); return; }
+            if (!this._ensure()) return;
+            this._unlocked = true;
+            this._resume();
+        } catch (e) {}
+    }
+
+    _resume() {
+        try {
+            if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        } catch (e) {}
+    }
+
+    get isMuted() {
+        try {
+            return localStorage.getItem('wordQuest_muted') === 'true';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    setMuted(m) {
+        try { localStorage.setItem('wordQuest_muted', m ? 'true' : 'false'); } catch (e) {}
+    }
+
+    toggle() {
+        const nowMuted = !this.isMuted;
+        this.setMuted(nowMuted);
+        return nowMuted;
+    }
+
+    /* ---- one-shot tone: freq → freq2 with an AD-style envelope ---- */
+    _tone(freq, { f2, type = 'sine', dur = 0.15, vol = 0.5, at = 0 } = {}) {
+        if (this.isMuted) return;
+        if (!this._ensure()) return;
+        this._resume();
+        const t  = this.ctx.currentTime + at;
+        const o  = this.ctx.createOscillator();
+        const g  = this.ctx.createGain();
+        o.type   = type;
+        o.frequency.setValueAtTime(freq, t);
+        if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+        o.connect(g).connect(this.master);
+        o.start(t);
+        o.stop(t + dur + 0.05);
+    }
+
+    /* ---- UI / selection clicks ---- */
+    playClick() { try { this._tone(660, { f2: 990, type: 'triangle', dur: 0.09, vol: 0.35 }); } catch (e) {} }
+
+    playSelect() { try { this._tone(520, { type: 'sine', dur: 0.05, vol: 0.22 }); } catch (e) {} }
+
+    /* ---- game outcomes ---- */
+    playCorrect() {
+        try {
+            [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
+                this._tone(f, { type: 'triangle', dur: 0.14, vol: 0.5, at: i * 0.06 }));
+        } catch (e) {}
+    }
+
+    playWrong() {
+        try { this._tone(220, { f2: 110, type: 'sawtooth', dur: 0.22, vol: 0.28 }); } catch (e) {}
+    }
+
+    playGameOver() {
+        try {
+            [392, 329.63, 261.63, 196].forEach((f, i) =>
+                this._tone(f, { type: 'triangle', dur: 0.32, vol: 0.45, at: i * 0.16 }));
+        } catch (e) {}
+    }
+
+    playWin() {
+        try {
+            this._tone(523.25, { type: 'triangle', dur: 0.18, vol: 0.5 });
+            this._tone(659.25, { type: 'triangle', dur: 0.18, vol: 0.5, at: 0.12 });
+            this._tone(783.99, { type: 'triangle', dur: 0.18, vol: 0.5, at: 0.24 });
+            this._tone(1046.5, { type: 'triangle', dur: 0.6,  vol: 0.55, at: 0.36 });
+        } catch (e) {}
+    }
+
+    playTick() {
+        try { this._tone(880, { type: 'square', dur: 0.06, vol: 0.16 }); } catch (e) {}
+    }
+
+    /* ---- ambient background loop REMOVED — sound effects only. --- */
+}
+
+/* Global audio instance used by the game. */
+const SFX = new SoundFX();
+
 /* ─── MAIN CLASS ─────────────────────────────── */
 class WordSearch {
 
@@ -132,70 +256,49 @@ class WordSearch {
 
     _applyDifficulty() {
         const lvl = this.level;
-        let timerSecs = 300;
-        let count     = 8;
-        let size      = 12;
-        let dirs      = [
+        // Fixed 5-minute timer on every level — the clock never shrinks,
+        // so each next level always feels winnable. Only words & grid grow.
+        const timerSecs = 300;
+
+        // +1 word per level (soft cap at 24 so the grid stays readable on phones)
+        const count = Math.min(24, 8 + (lvl - 1));
+
+        // Grid grows by 1 cell every 2 levels (soft cap at 20×20)
+        const size = Math.min(20, 12 + Math.floor((lvl - 1) / 2));
+
+        // Steady, generous score multiplier — higher levels are worth the grind
+        const mult = 1.0 + (lvl - 1) * 0.1;
+
+        // Directions: easy start, then everything is available from L3 on
+        let dirs = [
             [1, 0],  // right
             [0, 1],  // down
             [1, 1]   // diagonal down-right
         ];
-        let smartGarbage = false;
-        let title     = 'Novice';
-        let mult      = 1.0;
-
         if (lvl === 2) {
-            timerSecs    = 240; // 4 mins
-            count        = 9;
-            size         = 12;
-            dirs         = [
+            dirs = [
                 [1, 0], [0, 1], [1, 1],
                 [-1, 0], [0, -1] // + reverse horizontal & vertical
             ];
-            smartGarbage = true;
-            title        = 'Apprentice';
-            mult         = 1.25;
-        } else if (lvl === 3) {
-            timerSecs    = 180; // 3 mins
-            count        = 10;
-            size         = 13;
-            dirs         = [
+        } else if (lvl >= 3) {
+            dirs = [
                 [1, 0], [0, 1], [1, 1], [-1, 1],
                 [-1, 0], [0, -1], [1, -1], [-1, -1] // all 8 directions
             ];
-            smartGarbage = true;
-            title        = 'Scholar';
-            mult         = 1.5;
-        } else if (lvl === 4) {
-            timerSecs    = 150; // 2.5 mins
-            count        = 11;
-            size         = 13;
-            dirs         = [
-                [1, 0], [0, 1], [1, 1], [-1, 1],
-                [-1, 0], [0, -1], [1, -1], [-1, -1]
-            ];
-            smartGarbage = true;
-            title        = 'Master';
-            mult         = 1.75;
-        } else if (lvl >= 5) {
-            timerSecs    = Math.max(90, 120 - (lvl - 5) * 10); // 2 mins down to 90s
-            count        = Math.min(14, 12 + Math.floor((lvl - 5) / 2));
-            size         = 14;
-            dirs         = [
-                [1, 0], [0, 1], [1, 1], [-1, 1],
-                [-1, 0], [0, -1], [1, -1], [-1, -1]
-            ];
-            smartGarbage = true;
-            title        = `Grandmaster Lvl ${lvl}`;
-            mult         = 2.0 + (lvl - 5) * 0.25;
         }
+
+        let title = 'Novice';
+        if (lvl === 2)          title = 'Apprentice';
+        else if (lvl === 3)     title = 'Scholar';
+        else if (lvl === 4)     title = 'Master';
+        else if (lvl >= 5)      title = `Grandmaster Lvl ${lvl}`;
 
         this.gridSize        = size;
         this.wordCount       = count;
         this.gameSecs        = timerSecs;
         this._remaining      = timerSecs;
         this.directions      = dirs;
-        this.useSmartGarbage = smartGarbage;
+        this.useSmartGarbage = lvl >= 2;
         this.levelTitle      = title;
         this.levelMultiplier = mult;
     }
@@ -676,6 +779,7 @@ class WordSearch {
 
         // ── Mouse ──────────────────────────────
         gridEl.addEventListener('mousedown', e => {
+            SFX.unlock();
             const cell = e.target.closest('.cell');
             if (!cell) return;
             e.preventDefault();
@@ -699,6 +803,7 @@ class WordSearch {
 
         // ── Touch ──────────────────────────────
         gridEl.addEventListener('touchstart', e => {
+            SFX.unlock();
             const touch = e.touches[0];
             const cell  = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.cell');
             if (!cell) return;
@@ -722,6 +827,26 @@ class WordSearch {
             this.selecting = false;
             this._checkSelection();
         });
+
+        // ── Sound toggle ─────────────────────────
+        const sndBtn = document.getElementById('sound-toggle-btn');
+        if (sndBtn) {
+            const syncIcons = () => {
+                const muted = SFX.isMuted;
+                sndBtn.classList.toggle('muted', muted);
+                const on  = document.getElementById('sound-icon-on');
+                const off = document.getElementById('sound-icon-off');
+                if (on)  on.classList.toggle('hidden', muted);
+                if (off) off.classList.toggle('hidden', !muted);
+            };
+            syncIcons();
+            sndBtn.addEventListener('click', () => {
+                SFX.unlock();
+                const muted = SFX.toggle();
+                syncIcons();
+                this._toast(muted ? 'Sound off' : 'Sound on', 1200);
+            });
+        }
     }
 
     /* ── SELECTION LOGIC ──────────────────────── */
@@ -745,6 +870,8 @@ class WordSearch {
 
         // must be straight line
         if (dr !== 0 && dc !== 0 && Math.abs(dr) !== Math.abs(dc)) return;
+
+        if (Math.max(Math.abs(dr), Math.abs(dc)) > 0) SFX.playSelect();
 
         const steps = Math.max(Math.abs(dr), Math.abs(dc));
         const stepR = steps === 0 ? 0 : dr / steps;
@@ -776,7 +903,10 @@ class WordSearch {
         });
 
         if (matched) {
+            SFX.playCorrect();
             this._markFound(matched);
+        } else if (this.selCells.length >= 2) {
+            SFX.playWrong();
         }
 
         this.selStart = null;
@@ -835,7 +965,8 @@ class WordSearch {
             this._remaining = Math.max(0, this._remaining - 1);
             this._renderTimer();
 
-            if (this._remaining === 30) this._toast('30 seconds remaining!', 1600);
+            if (this._remaining === 30) { this._toast('30 seconds remaining!', 1600); SFX.playTick(); }
+            if (this._remaining <= 5 && this._remaining > 0) { SFX.playTick(); }
             if (this._remaining <= 0) {
                 this._stopTimer();
                 this._timeUp();
@@ -909,6 +1040,7 @@ class WordSearch {
     _win() {
         this._stopTimer();
         this._unregisterActiveGame();
+        SFX.playWin();
         
         const { totalBonus, timeBonus, speedTierBonus, tierName } = this._calculateSpeedBonus();
         this.score += totalBonus;
@@ -954,6 +1086,7 @@ class WordSearch {
 
     _timeUp() {
         this._unregisterActiveGame();
+        SFX.playGameOver();
         this._clearRoundScore(); // round not cleared — the earned points are NOT banked
 
         // 1. Reveal answers on grid immediately

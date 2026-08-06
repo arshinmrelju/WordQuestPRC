@@ -718,6 +718,22 @@
     font-weight: 700;
 }
 
+.spectate-timer {
+    font-family: 'Courier New', monospace;
+    font-size: 1.1rem;
+    color: var(--accent-gold-light);
+    transition: color 0.3s;
+}
+.spectate-timer.spectate-timer-danger {
+    color: #ef4444;
+    animation: spectateTimerBlink 0.7s infinite alternate;
+}
+
+@keyframes spectateTimerBlink {
+    from { opacity: 1; }
+    to   { opacity: 0.45; }
+}
+
 .spectate-body {
     display: grid;
     grid-template-columns: 1fr 240px;
