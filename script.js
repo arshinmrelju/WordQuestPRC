@@ -466,6 +466,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // ------------------------------------------------------------------
     // 11. Leaderboard rendering (live from Firestore, fallback to localStorage)
     // ------------------------------------------------------------------
+    function medalSvg(kind, num) {
+        const colors = { gold: ['#f7c948', '#b8860b'], silver: ['#cfd8dc', '#90a4ae'], bronze: ['#e0a458', '#b4652a'] };
+        const [face, edge] = colors[kind] || colors.gold;
+        return `<svg class="rank-medal" width="20" height="20" viewBox="0 0 24 24" aria-label="${num}st place">
+            <circle cx="12" cy="14" r="7" fill="${edge}"/>
+            <circle cx="12" cy="14" r="5.6" fill="${face}"/>
+            <path d="M8.21 13.89 7 22l5-3 5 3-1.21-8.11" stroke="${edge}" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="12" y="15.1" font-size="7" font-weight="bold" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif">${num}</text>
+        </svg>`;
+    }
+
     function renderLeaderboardRows(list) {
         const tbody = document.getElementById('lb-body');
         if (!tbody) return;
@@ -489,9 +500,9 @@ document.addEventListener('DOMContentLoaded', () => {
             deduped.slice(0, 10).forEach((item, index) => {
                 const tr = document.createElement('tr');
                 let rank = `${index + 1}`;
-                if (index === 0) rank = '🥇';
-                else if (index === 1) rank = '🥈';
-                else if (index === 2) rank = '🥉';
+                if (index === 0) rank = medalSvg('gold', '1');
+                else if (index === 1) rank = medalSvg('silver', '2');
+                else if (index === 2) rank = medalSvg('bronze', '3');
                 const dept = item.department ? String(item.department).replace('Department of ', '') : '';
                 tr.innerHTML = `
                     <td><strong>${rank}</strong></td>

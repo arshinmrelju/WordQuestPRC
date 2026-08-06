@@ -1525,6 +1525,12 @@ body {
     color: var(--accent-gold-light);
 }
 
+.rank-medal {
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 0;
+}
+
 .leaderboard-section {
     margin-bottom: 1.5rem;
     text-align: left;

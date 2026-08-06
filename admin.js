@@ -138,6 +138,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<span class="status-pill-offline">Offline</span>`;
     }
 
+    function medalSvg(kind, num) {
+        const colors = { gold: ['#f7c948', '#b8860b'], silver: ['#cfd8dc', '#90a4ae'], bronze: ['#e0a458', '#b4652a'] };
+        const [face, edge] = colors[kind] || colors.gold;
+        return `<svg class="rank-medal" width="20" height="20" viewBox="0 0 24 24" aria-label="${num}st place">
+            <circle cx="12" cy="14" r="7" fill="${edge}"/>
+            <circle cx="12" cy="14" r="5.6" fill="${face}"/>
+            <path d="M8.21 13.89 7 22l5-3 5 3-1.21-8.11" stroke="${edge}" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="12" y="15.1" font-size="7" font-weight="bold" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif">${num}</text>
+        </svg>`;
+    }
+
     function getLevelBadgeHtml(lvlNum, lvlTitle) {
         const lvl = lvlNum || 1;
         const title = lvlTitle || (lvl === 1 ? 'Novice' : lvl === 2 ? 'Apprentice' : lvl === 3 ? 'Scholar' : lvl === 4 ? 'Master' : `Grandmaster Lvl ${lvl}`);
@@ -576,9 +587,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const tr = document.createElement('tr');
             
             let rankBadge = `${idx + 1}`;
-            if (idx === 0) rankBadge = '🥇';
-            else if (idx === 1) rankBadge = '🥈';
-            else if (idx === 2) rankBadge = '🥉';
+            if (idx === 0) rankBadge = medalSvg('gold', '1');
+            else if (idx === 1) rankBadge = medalSvg('silver', '2');
+            else if (idx === 2) rankBadge = medalSvg('bronze', '3');
 
             const rollDisplay = item.rollNumber || '—';
             const deptDisplay = item.department ? item.department.replace('Department of ', '') : '—';

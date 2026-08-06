@@ -1004,6 +1004,17 @@ class WordQuestEngine {
         }
     }
 
+    _buildMedalSvg(kind, num) {
+        const colors = { gold: ['#f7c948', '#b8860b'], silver: ['#cfd8dc', '#90a4ae'], bronze: ['#e0a458', '#b4652a'] };
+        const [face, edge] = colors[kind] || colors.gold;
+        return `<svg class="rank-medal" width="20" height="20" viewBox="0 0 24 24" aria-label="${num}st place">
+            <circle cx="12" cy="14" r="7" fill="${edge}"/>
+            <circle cx="12" cy="14" r="5.6" fill="${face}"/>
+            <path d="M8.21 13.89 7 22l5-3 5 3-1.21-8.11" stroke="${edge}" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="12" y="15.1" font-size="7" font-weight="bold" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif">${num}</text>
+        </svg>`;
+    }
+
     renderLeaderboardTable() {
         if (!this.leaderboardBody) return;
         this.leaderboardBody.innerHTML = '';
@@ -1017,10 +1028,7 @@ class WordQuestEngine {
 
             list.forEach((item, index) => {
                 const tr = document.createElement('tr');
-                let rankBadge = `${index + 1}`;
-                if (index === 0) rankBadge = '🥇';
-                else if (index === 1) rankBadge = '🥈';
-                else if (index === 2) rankBadge = '🥉';
+                const rankBadge = (index === 0) ? this._buildMedalSvg('gold', '1') : (index === 1) ? this._buildMedalSvg('silver', '2') : (index === 2) ? this._buildMedalSvg('bronze', '3') : `${index + 1}`;
 
                 const deptText = item.department ? item.department.replace('Department of ', '') : item.difficulty;
 
