@@ -392,11 +392,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><strong class="gold-text">${roundScore}</strong></td>
                 <td><span class="cum-score">${totalScore}</span></td>
                 <td><a href="tel:${escapeHtml(phoneDisplay)}" style="color: var(--accent-gold-light); font-weight: 600; text-decoration: none;">${escapeHtml(phoneDisplay)}</a></td>
-                <td style="text-align: right;">
-                    <button class="glass-btn btn-sm btn-secondary btn-spectate-grid" data-id="${item.id}" title="Inspect Live Grid">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                        <span>Live Grid</span>
-                    </button>
+                <td class="action-cell">
+                    <div class="action-btns">
+                        <button class="glass-btn btn-sm btn-secondary btn-icon btn-msg-player" data-id="${item.id}" data-name="${escapeHtml((item.name || 'Anonymous').replace(/"/g, '&quot;'))}" title="Send a live message to this player" aria-label="Message player">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </button>
+                        <button class="glass-btn btn-sm btn-secondary btn-icon btn-spectate-grid" data-id="${item.id}" title="Inspect Live Grid" aria-label="Inspect live grid">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                 </td>
             `;
             liveTableBody.appendChild(tr);
@@ -408,6 +412,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const id = btn.getAttribute('data-id');
                 const player = deduped.find(p => p.id === id);
                 if (player) openSpectatorModal(player);
+            });
+        });
+
+        // Event Handlers for messaging a single live player
+        liveTableBody.querySelectorAll('.btn-msg-player').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                const player = deduped.find(p => p.id === id);
+                if (player) openMessageCompose(player);
             });
         });
     }
@@ -594,6 +607,100 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         }
+    }
+
+    // ----------------------------------------------------------------------
+    // 4.7. Admin Message Compose Modal (single player or broadcast to live)
+    // ----------------------------------------------------------------------
+    let msgComposeTarget = null; // { type: 'single', id, name } | { type: 'broadcast', ids: [] }
+
+    const msgComposeModal = document.getElementById('modal-msg-compose');
+    const msgComposeTitleEl = document.getElementById('msg-compose-title');
+    const msgComposeSubEl = document.getElementById('msg-compose-sub');
+    const msgComposeTextEl = document.getElementById('msg-compose-text');
+    const msgComposeSendBtn = document.getElementById('msg-compose-send');
+    const msgComposeCancelBtn = document.getElementById('msg-compose-cancel');
+    const closeMsgComposeBtn = document.getElementById('close-msg-compose');
+
+    function openMessageCompose(player) {
+        msgComposeTarget = { type: 'single', id: player.id, name: player.name || 'Anonymous Player' };
+        if (msgComposeTitleEl) msgComposeTitleEl.textContent = 'Message to Player';
+        if (msgComposeSubEl) {
+            msgComposeSubEl.textContent = `${msgComposeTarget.name} • Roll: ${player.rollNumber || '—'}`;
+        }
+        if (msgComposeTextEl) msgComposeTextEl.value = '';
+        if (msgComposeModal) msgComposeModal.classList.remove('hidden');
+        if (msgComposeTextEl) setTimeout(() => msgComposeTextEl.focus(), 60);
+    }
+
+    function openBroadcastCompose(livePlayers) {
+        const ids = livePlayers.map(p => p.id).filter(Boolean);
+        if (ids.length === 0) {
+            alert('No live players currently online to broadcast to.');
+            return;
+        }
+        msgComposeTarget = { type: 'broadcast', ids };
+        if (msgComposeTitleEl) msgComposeTitleEl.textContent = 'Broadcast to Live Players';
+        if (msgComposeSubEl) msgComposeSubEl.textContent = `This message will go to ${ids.length} live player${ids.length === 1 ? '' : 's'} in real time.`;
+        if (msgComposeTextEl) msgComposeTextEl.value = '';
+        if (msgComposeModal) msgComposeModal.classList.remove('hidden');
+        if (msgComposeTextEl) setTimeout(() => msgComposeTextEl.focus(), 60);
+    }
+
+    function closeMessageCompose() {
+        if (msgComposeModal) msgComposeModal.classList.add('hidden');
+        msgComposeTarget = null;
+        if (msgComposeTextEl) msgComposeTextEl.value = '';
+    }
+
+    async function sendComposedMessage() {
+        const text = (msgComposeTextEl ? msgComposeTextEl.value : '').trim();
+        if (!text) {
+            alert('Please type a message before sending.');
+            return;
+        }
+        if (!msgComposeTarget) return;
+        if (msgComposeSendBtn) {
+            msgComposeSendBtn.disabled = true;
+        }
+
+        const fb = window.WordQuestFirebase;
+        let ok = false;
+        if (msgComposeTarget.type === 'single') {
+            if (fb && fb.sendMessageToPlayer) {
+                ok = await fb.sendMessageToPlayer(msgComposeTarget.id, text);
+            }
+        } else {
+            if (fb && fb.broadcastMessageToLivePlayers) {
+                const sent = await fb.broadcastMessageToLivePlayers(msgComposeTarget.ids, text);
+                ok = sent > 0;
+            }
+        }
+
+        if (ok) {
+            const wasBroadcast = msgComposeTarget.type === 'broadcast';
+            closeMessageCompose();
+            alert(wasBroadcast ? 'Message broadcast to all live players.' : 'Message sent to the player.');
+        } else {
+            if (msgComposeSendBtn) msgComposeSendBtn.disabled = false;
+            alert('Failed to send message. Please check the player is still live and try again.');
+        }
+    }
+
+    if (msgComposeSendBtn) msgComposeSendBtn.addEventListener('click', sendComposedMessage);
+    if (msgComposeCancelBtn) msgComposeCancelBtn.addEventListener('click', closeMessageCompose);
+    if (closeMsgComposeBtn) closeMsgComposeBtn.addEventListener('click', closeMessageCompose);
+    if (msgComposeModal) {
+        msgComposeModal.addEventListener('click', (e) => {
+            if (e.target === msgComposeModal) closeMessageCompose();
+        });
+    }
+    const broadcastBtn = document.getElementById('btn-broadcast-message');
+    if (broadcastBtn) {
+        broadcastBtn.addEventListener('click', () => {
+            const livePlayers = deduplicatePlayers(playersList).filter(p => isPlayerLiveInGame(p));
+            openBroadcastCompose(livePlayers);
+        });
     }
 
     // ----------------------------------------------------------------------

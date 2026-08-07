@@ -634,6 +634,85 @@ export function subscribeToGameState(callback) {
     }
 }
 
+/**
+ * Send a message from the Admin to a single live player.
+ * Uses a dedicated `player_messages/{playerId}` doc so messages never collide
+ * with the heavily-updated player doc (liveState / heartbeat).
+ * Overwrite semantics: a new message replaces the current one for that player.
+ * @param {string} playerId Firestore player doc id
+ * @param {string} text Message body
+ */
+export async function sendMessageToPlayer(playerId, text) {
+    if (!playerId || !text) return false;
+    try {
+        await setDoc(doc(db, "player_messages", playerId), {
+            text: text,
+            from: "Admin",
+            sentAt: serverTimestamp(),
+            read: false
+        }, { merge: true });
+        console.log("Message sent to player:", playerId);
+        return true;
+    } catch (e) {
+        console.warn("Firestore sendMessageToPlayer error:", e);
+        return false;
+    }
+}
+
+/**
+ * Broadcast a message from the Admin to a list of live players.
+ * @param {string[]} playerIds Array of Firestore player doc ids
+ * @param {string} text Message body
+ */
+export async function broadcastMessageToLivePlayers(playerIds, text) {
+    if (!Array.isArray(playerIds) || playerIds.length === 0 || !text) return 0;
+    let sent = 0;
+    const results = playerIds.map((id) =>
+        sendMessageToPlayer(id, text).then((ok) => { if (ok) sent++; })
+    );
+    await Promise.allSettled(results);
+    console.log("Broadcast message sent to", sent, "players");
+    return sent;
+}
+
+/**
+ * Subscribe to the player's admin-message doc in real time.
+ * @param {string} playerId Firestore player doc id
+ * @param {Function} callback Called with the message object ({ text, sentAt, read }) or null when cleared
+ */
+export function subscribeToPlayerMessages(playerId, callback) {
+    if (!playerId) return () => {};
+    try {
+        return onSnapshot(doc(db, "player_messages", playerId), (docSnap) => {
+            if (docSnap.exists()) {
+                callback({ id: docSnap.id, ...docSnap.data() });
+            } else {
+                callback(null);
+            }
+        }, (error) => {
+            console.warn("Message snapshot error for player:", playerId, error);
+        });
+    } catch (e) {
+        console.warn("subscribeToPlayerMessages error:", e);
+        return () => {};
+    }
+}
+
+/**
+ * Acknowledge and clear the admin message for a player so a future
+ * message is detected fresh (overwrite semantics).
+ * @param {string} playerId Firestore player doc id
+ */
+export async function acknowledgePlayerMessage(playerId) {
+    if (!playerId) return;
+    try {
+        await deleteDoc(doc(db, "player_messages", playerId));
+        console.log("Player message acknowledged & cleared:", playerId);
+    } catch (e) {
+        console.warn("Firestore acknowledgePlayerMessage error:", e);
+    }
+}
+
 // Make available globally for non-module scripts if needed
 window.WordQuestFirebase = {
     app,
@@ -659,6 +738,10 @@ window.WordQuestFirebase = {
     setGameStateInFirestore,
     getGameStateFromFirestore,
     subscribeToGameState,
+    sendMessageToPlayer,
+    broadcastMessageToLivePlayers,
+    subscribeToPlayerMessages,
+    acknowledgePlayerMessage,
     clearAllDataFromFirestore
 };
 

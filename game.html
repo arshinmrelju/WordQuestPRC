@@ -153,6 +153,23 @@
 
     <!-- ════ OVERLAYS ════ -->
 
+    <!-- Live Admin Message Popup (pauses timer while open) -->
+    <div class="overlay-backdrop hidden" id="admin-msg-overlay" role="dialog" aria-modal="true">
+        <div class="glass-card overlay-dialog admin-msg-dialog">
+            <div class="admin-msg-icon" aria-hidden="true">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/>
+                </svg>
+            </div>
+            <h2 class="overlay-title">Message from Admin</h2>
+            <p class="overlay-sub">You received a live announcement from the admin.</p>
+            <div class="admin-msg-body" id="admin-msg-body"></div>
+            <div class="btn-group">
+                <button class="glass-btn btn-primary" onclick="WS.closeAdminMessage()">OK</button>
+            </div>
+        </div>
+    </div>
+
     <!-- End (win / time-up) -->
     <div class="overlay-backdrop hidden" id="overlay-end" role="dialog" aria-modal="true">
         <div class="glass-card overlay-dialog">

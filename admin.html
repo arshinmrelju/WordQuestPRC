@@ -163,6 +163,11 @@
                         <input type="text" id="admin-search-input" class="glass-input search-input" placeholder="Search name or roll number...">
                     </div>
 
+                    <!-- Broadcast Message to Live Players -->
+                    <button type="button" id="btn-broadcast-message" class="glass-btn btn-secondary btn-icon btn-broadcast" title="Send a message to all currently live players" aria-label="Broadcast message to live players">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                    </button>
+
                     <!-- Department Filter -->
                     <div class="filter-wrapper">
                         <select id="admin-dept-filter" class="glass-input glass-select filter-select">
@@ -348,6 +353,27 @@
                     <h4 class="spectate-sidebar-title">Target Words Checklist</h4>
                     <div id="spectate-words-list" class="spectate-words-list"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Message Compose Modal -->
+    <div id="modal-msg-compose" class="modal-overlay hidden">
+        <div class="modal-content glass-card msg-compose-modal animate-scale-up">
+            <div class="spectate-header">
+                <div class="spectate-player-info">
+                    <span class="status-pill-live"><span class="live-pulse-dot"></span>ADMIN MESSAGE</span>
+                    <h2 id="msg-compose-title" class="spectate-player-title">Send Message</h2>
+                    <div id="msg-compose-sub" class="spectate-player-sub">Live players only</div>
+                </div>
+                <button type="button" id="close-msg-compose" class="modal-close-btn" title="Close">&times;</button>
+            </div>
+
+            <label class="msg-compose-label" for="msg-compose-text">Message</label>
+            <textarea id="msg-compose-text" class="msg-compose-textarea" rows="5" maxlength="500" placeholder="Type your live announcement here..."></textarea>
+            <div class="msg-compose-actions">
+                <button type="button" id="msg-compose-send" class="glass-btn btn-primary">Send</button>
+                <button type="button" id="msg-compose-cancel" class="glass-btn btn-secondary">Cancel</button>
             </div>
         </div>
     </div>

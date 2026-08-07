@@ -229,6 +229,10 @@ class WordSearch {
         /* timer */
         this._remaining = GAME_SECS;
         this._timer     = null;
+        this._timerPaused = false;
+
+        /* admin message popup */
+        this._msgUnsubscribe = null;
 
         /* word definitions state */
         this._defBannerTimer = null;
@@ -352,6 +356,7 @@ class WordSearch {
         this._renderHistory();
         this._registerActiveGame();
         this._listenForGameState(); // 🔴 Real-time admin end-game kick
+        this._listenForAdminMessages(); // 📨 Real-time admin message popup
 
         // Load custom word bank from Firestore (for next game or restart)
         this._loadWordBankFromFirebase();
@@ -391,6 +396,7 @@ class WordSearch {
         this._renderHistory();
         this._registerActiveGame();
         this._listenForGameState();
+        this._listenForAdminMessages();
     }
 
     /* ── FIREBASE ACTIVE GAME & LEVEL TRACKING ─── */
@@ -479,6 +485,53 @@ class WordSearch {
                 }
             });
         }
+    }
+
+    /* ── ADMIN MESSAGE POPUP ─────────────────────
+       Live admin → player messaging. A new message pauses the timer,
+       the popup blocks play, and closing the popup resumes the timer. */
+    _listenForAdminMessages() {
+        if (this._msgUnsubscribe) {
+            this._msgUnsubscribe();
+            this._msgUnsubscribe = null;
+        }
+        const playerId = localStorage.getItem('wordQuest_playerFirestoreId');
+        if (!playerId || !window.WordQuestFirebase || !window.WordQuestFirebase.subscribeToPlayerMessages) {
+            return;
+        }
+        let lastMsgId = null;
+        this._msgUnsubscribe = window.WordQuestFirebase.subscribeToPlayerMessages(playerId, (msg) => {
+            if (!msg || !msg.text) return;
+            const msgId = (msg.sentAt && (msg.sentAt.toMillis ? msg.sentAt.toMillis() : String(msg.sentAt))) + '|' + msg.text;
+            if (msgId === lastMsgId) return;   // ignore re-snapshot of same message
+            if (msg.read) return;
+            lastMsgId = msgId;
+            this._showAdminMessage(msg.text);
+        });
+    }
+
+    _showAdminMessage(text) {
+        const overlay = document.getElementById('admin-msg-overlay');
+        const bodyEl = document.getElementById('admin-msg-body');
+        if (bodyEl) bodyEl.textContent = text;
+        if (overlay) overlay.classList.remove('hidden');
+
+        // Pause the countdown so the message does not eat into the player's time
+        if (this._timer || this._timerPaused) this._pauseTimer();
+        if (window.SFX) { try { SFX.playCorrect(); } catch (e) {} }
+    }
+
+    closeAdminMessage() {
+        const overlay = document.getElementById('admin-msg-overlay');
+        if (overlay) overlay.classList.add('hidden');
+
+        const playerId = localStorage.getItem('wordQuest_playerFirestoreId');
+        if (window.WordQuestFirebase && window.WordQuestFirebase.acknowledgePlayerMessage && playerId) {
+            window.WordQuestFirebase.acknowledgePlayerMessage(playerId);
+        }
+
+        // Resume the countdown exactly where it was paused
+        this._resumeTimer();
     }
 
     /* ── WORD BANK FROM FIREBASE ───────────────── */
@@ -1072,6 +1125,26 @@ class WordSearch {
     _stopTimer() {
         clearInterval(this._timer);
         this._timer = null;
+    }
+
+    /* Pause the countdown without ending the game (used by the admin-message popup).
+       The timer resumes where it left off when the popup closes. */
+    _pauseTimer() {
+        if (this._timer) {
+            clearInterval(this._timer);
+            this._timer = null;
+            this._timerPaused = true;
+            this._renderTimer();
+        }
+    }
+
+    _resumeTimer() {
+        if (this._timerPaused && this._remaining > 0 && !this._timer) {
+            this._timerPaused = false;
+            this._startTimer();
+        } else {
+            this._timerPaused = false;
+        }
     }
 
     _renderTimer() {
