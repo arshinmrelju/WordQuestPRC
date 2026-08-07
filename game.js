@@ -230,6 +230,10 @@ class WordSearch {
         this._remaining = GAME_SECS;
         this._timer     = null;
 
+        /* word definitions state */
+        this._defBannerTimer = null;
+        this.foundDefinitions = {};
+
         /* live sync heartbeat */
         this._heartbeat = null;
     }
@@ -324,6 +328,9 @@ class WordSearch {
         this.selecting  = false;
         this.selStart   = null;
         this.selCells   = [];
+        this.foundDefinitions = {};
+        this.hideDefinitionBanner();
+        document.getElementById('end-definitions-summary')?.classList.add('hidden');
 
         // Rehydrate cumulative score / level from Firestore (source of truth across devices)
         await this._restoreProgressFromFirestore();
@@ -364,6 +371,9 @@ class WordSearch {
         this.selecting  = false;
         this.selStart   = null;
         this.selCells   = [];
+        this.foundDefinitions = {};
+        this.hideDefinitionBanner();
+        document.getElementById('end-definitions-summary')?.classList.add('hidden');
 
         this._loadUsedWords();
         this._loadPlayerLevel();
@@ -644,10 +654,11 @@ class WordSearch {
         this.placed = {};
         const placedWords = [];
 
-        // Exclude words already shown to this player in earlier rounds.
-        // If too few unused words remain, fall back to the full pool (reuse) so the game stays playable.
-        let unusedPool = this.candidatePool.filter(w => !this.usedWords.includes(w));
-        if (unusedPool.length < this.wordCount) unusedPool = [...this.candidatePool];
+        // Exclude words already shown to this player in earlier rounds,
+        // and strictly filter by w.length <= this.gridSize so words always fit the grid.
+        const validCandidates = (this.candidatePool || WORD_BANK).filter(w => w && w.length <= this.gridSize);
+        let unusedPool = validCandidates.filter(w => !this.usedWords.includes(w));
+        if (unusedPool.length < this.wordCount) unusedPool = [...validCandidates];
         const pool = unusedPool.sort(() => Math.random() - 0.5);
 
         for (const word of pool) {
@@ -657,10 +668,11 @@ class WordSearch {
             }
         }
 
-        // If pool was exhausted before reaching this.wordCount, retry with default WORD_BANK fallback
+        // If pool was exhausted before reaching this.wordCount, retry with default WORD_BANK fallback (filtered by gridSize)
         if (placedWords.length < this.wordCount) {
-            let fallback = WORD_BANK.filter(w => !placedWords.includes(w) && !this.usedWords.includes(w));
-            if (fallback.length < this.wordCount) fallback = [...WORD_BANK]; // last resort — reuse
+            const validBank = WORD_BANK.filter(w => w && w.length <= this.gridSize);
+            let fallback = validBank.filter(w => !placedWords.includes(w) && !this.usedWords.includes(w));
+            if (fallback.length < (this.wordCount - placedWords.length)) fallback = validBank.filter(w => !placedWords.includes(w));
             const fallbackPool = fallback.sort(() => Math.random() - 0.5);
             for (const word of fallbackPool) {
                 if (placedWords.length >= this.wordCount) break;
@@ -777,9 +789,10 @@ class WordSearch {
     _renderWordList() {
         const listEl = document.getElementById('word-list');
         if (!listEl) return;
-        listEl.innerHTML = this.words.map(w =>
-            `<li id="word-${w}">${w}</li>`
-        ).join('');
+        listEl.innerHTML = (this.words || []).map(w => {
+            const display = window.formatWordForDisplay ? window.formatWordForDisplay(w) : w;
+            return `<li id="word-${w}">${display}</li>`;
+        }).join('');
         this._updateHUD();
     }
 
@@ -947,10 +960,15 @@ class WordSearch {
 
         // Strike word in list
         const li = document.getElementById(`word-${word}`);
-        if (li) li.classList.add('found-word');
+        if (li) {
+            li.classList.add('found-word');
+            li.setAttribute('title', 'Click to view word meaning');
+            li.onclick = () => this._showDefinitionBanner(word);
+        }
 
         this._updateHUD();
         this._toast(`✓ Found: ${word}`, 1400);
+        this._showDefinitionBanner(word);
         this._saveLiveProgress(); // ⚡ Instantly update Firestore leaderboard when a word is found!
         this._syncLiveGrid();     // ⚡ Sync live 2D grid matrix to Firestore for admin spectators!
 
@@ -958,6 +976,69 @@ class WordSearch {
         if (this.foundWords.size === this.words.length) {
             this._win();
         }
+    }
+
+    /* ── WORD DEFINITION BANNER & SUMMARY ─────── */
+    async _showDefinitionBanner(word) {
+        if (!word) return;
+        const banner = document.getElementById('definition-banner');
+        if (!banner) return;
+
+        const wordEl = document.getElementById('def-banner-word');
+        const textEl = document.getElementById('def-banner-text');
+
+        const defData = window.getWordDefinition ? await window.getWordDefinition(word) : { wordDisplay: word, definition: 'A featured term in Word Quest.' };
+        this.foundDefinitions[word] = defData;
+
+        if (wordEl) wordEl.textContent = defData.wordDisplay;
+        if (textEl) textEl.textContent = defData.definition;
+
+        banner.classList.remove('hidden');
+        banner.style.animation = 'none';
+        banner.offsetHeight; // trigger reflow
+        banner.style.animation = 'defBannerSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+
+        if (this._defBannerTimer) clearTimeout(this._defBannerTimer);
+        this._defBannerTimer = setTimeout(() => {
+            this.hideDefinitionBanner();
+        }, 5500);
+    }
+
+    hideDefinitionBanner() {
+        const banner = document.getElementById('definition-banner');
+        if (banner) banner.classList.add('hidden');
+        if (this._defBannerTimer) {
+            clearTimeout(this._defBannerTimer);
+            this._defBannerTimer = null;
+        }
+    }
+
+    async _renderEndDefinitionsSummary() {
+        const wrap = document.getElementById('end-definitions-summary');
+        const listEl = document.getElementById('end-defs-list');
+        if (!wrap || !listEl) return;
+
+        listEl.innerHTML = '';
+        const wordsToReview = this.foundWords.size > 0 ? Array.from(this.foundWords) : this.words;
+
+        for (const w of wordsToReview) {
+            const defData = this.foundDefinitions[w] || (window.getWordDefinition ? await window.getWordDefinition(w) : { wordDisplay: w, definition: 'A featured term in Word Quest.' });
+            const item = document.createElement('div');
+            item.className = 'end-def-item';
+            item.innerHTML = `
+                <div class="end-def-word">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 5px; color: var(--accent-gold);">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                    <span>${defData.wordDisplay}</span>
+                </div>
+                <p class="end-def-meaning">${defData.definition}</p>
+            `;
+            listEl.appendChild(item);
+        }
+
+        wrap.classList.remove('hidden');
     }
 
     /* ── HUD UPDATE ───────────────────────────── */
@@ -1093,6 +1174,8 @@ class WordSearch {
 
         const cumEl = document.getElementById('cumulative-result-num');
         if (cumEl) cumEl.textContent = this.cumulativeScore;
+
+        this._renderEndDefinitionsSummary();
         
         document.getElementById('overlay-end')?.classList.remove('hidden');
         document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
@@ -1133,6 +1216,8 @@ class WordSearch {
             const cumEl = document.getElementById('cumulative-result-num');
             if (cumEl) cumEl.textContent = this.cumulativeScore;
             
+            this._renderEndDefinitionsSummary();
+
             document.getElementById('overlay-end')?.classList.remove('hidden');
             document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
         }, 1200);

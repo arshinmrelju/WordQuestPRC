@@ -173,6 +173,18 @@
                 <span class="score-showcase-label">cumulative total</span>
             </div>
 
+            <!-- End round word meanings review section -->
+            <div id="end-definitions-summary" class="end-definitions-wrap hidden">
+                <h4 class="end-defs-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                    <span>Word Meanings Discovered</span>
+                </h4>
+                <div id="end-defs-list" class="end-defs-list"></div>
+            </div>
+
             <div class="btn-group">
                 <button class="glass-btn btn-primary" onclick="WS.restart()">Play Again</button>
                 <button class="glass-btn btn-secondary" onclick="WS.toggleOverlay()">Inspect Grid</button>
@@ -187,10 +199,27 @@
         <span>Show Results</span>
     </button>
 
+    <!-- Floating Non-Blocking Definition Toast / Banner -->
+    <div id="definition-banner" class="definition-banner hidden" role="status" aria-live="polite">
+        <div class="def-banner-content">
+            <div class="def-banner-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="def-banner-svg">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <span class="def-banner-word" id="def-banner-word">WORD</span>
+                <span class="def-banner-badge">Found!</span>
+            </div>
+            <p class="def-banner-text" id="def-banner-text">Definition goes here...</p>
+        </div>
+        <button class="def-banner-close" onclick="WS.hideDefinitionBanner()" aria-label="Close definition">&times;</button>
+    </div>
+
     <!-- Toast stack -->
     <div id="toast-area" class="toast-stack" aria-live="polite"></div>
 
     <script type="module" src="firebase-service.js"></script>
+    <script src="dictionary.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
