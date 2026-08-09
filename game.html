@@ -170,6 +170,33 @@
         </div>
     </div>
 
+    <!-- Game Ended by Admin (shown to all live players in real time) -->
+    <div class="overlay-backdrop hidden" id="ended-overlay" role="dialog" aria-modal="true">
+        <div class="glass-card overlay-dialog ended-dialog">
+            <div class="ended-icon" aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+            </div>
+            <h2 class="overlay-title">Game Ended</h2>
+            <p class="overlay-sub">The admin has ended this game session. The game is now closed for all players — thank you for playing Word Quest!</p>
+
+            <div class="score-showcase">
+                <span class="score-showcase-num gold-text" id="ended-round-score">0</span>
+                <span class="score-showcase-label">this game</span>
+            </div>
+            <div class="score-showcase score-showcase-sm">
+                <span class="score-showcase-num" id="ended-cumulative-score">0</span>
+                <span class="score-showcase-label">cumulative total</span>
+            </div>
+
+            <div class="btn-group">
+                <button class="glass-btn btn-primary" onclick="WS.goToMainMenu()">Return to Main Menu</button>
+                <button class="glass-btn btn-secondary" onclick="WS.openLeaderboard()">View Leaderboard</button>
+            </div>
+        </div>
+    </div>
+
     <!-- End (win / time-up) -->
     <div class="overlay-backdrop hidden" id="overlay-end" role="dialog" aria-modal="true">
         <div class="glass-card overlay-dialog">
@@ -205,7 +232,28 @@
             <div class="btn-group">
                 <button class="glass-btn btn-primary" onclick="WS.restart()">Play Again</button>
                 <button class="glass-btn btn-secondary" onclick="WS.toggleOverlay()">Inspect Grid</button>
+                <button class="glass-btn btn-secondary" onclick="WS.openLeaderboard()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 5px;"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+                    Leaderboard
+                </button>
                 <a href="index.html" class="glass-btn btn-secondary">Main Menu</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaderboard Popup (no redirect — stays in game.html) -->
+    <div class="overlay-backdrop hidden" id="leaderboard-overlay" role="dialog" aria-modal="true">
+        <div class="glass-card overlay-dialog leaderboard-dialog">
+            <div class="leaderboard-dialog-icon" aria-hidden="true">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+            </div>
+            <h2 class="overlay-title">Leaderboard</h2>
+            <p class="overlay-sub">Top scorers from today's competition</p>
+            <div class="lb-list-wrap">
+                <div id="game-lb-list" class="lb-list"></div>
+            </div>
+            <div class="btn-group">
+                <button class="glass-btn btn-secondary" onclick="WS.closeLeaderboard()">Close</button>
             </div>
         </div>
     </div>

@@ -234,6 +234,9 @@ class WordSearch {
         /* admin message popup */
         this._msgUnsubscribe = null;
 
+        /* in-game leaderboard popup */
+        this._leaderboardUnsub = null;
+
         /* word definitions state */
         this._defBannerTimer = null;
         this.foundDefinitions = {};
@@ -480,11 +483,121 @@ class WordSearch {
                 if (!isActive) {
                     this._stopTimer();
                     this._unregisterActiveGame();
-                    alert('⛔ The game has been Ended by the Admin. Access to game.html is closed.');
-                    window.location.href = 'index.html';
+                    this._showGameEndedScreen();
                 }
             });
         }
+    }
+
+    /* Live "Game Ended by Admin" screen shown to all active players in real time. */
+    _showGameEndedScreen() {
+        const overlay = document.getElementById('ended-overlay');
+        if (!overlay) return;
+
+        const roundEl = document.getElementById('ended-round-score');
+        if (roundEl) roundEl.textContent = this.score;
+        const cumEl = document.getElementById('ended-cumulative-score');
+        if (cumEl) cumEl.textContent = this.cumulativeScore;
+
+        // Close any competing overlays / popups so the screen is unmissable
+        document.getElementById('overlay-end')?.classList.add('hidden');
+        document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
+        document.getElementById('admin-msg-overlay')?.classList.add('hidden');
+
+        SFX.playGameOver();
+        overlay.classList.remove('hidden');
+    }
+
+    goToMainMenu() {
+        window.location.href = 'index.html';
+    }
+
+    /* ── IN-GAME LEADERBOARD POPUP ─────────────────
+       Opens a non-redirecting leaderboard modal inside game.html using the
+       same Firestore real-time data the admin panel + index page consume. */
+    openLeaderboard() {
+        const overlay = document.getElementById('leaderboard-overlay');
+        if (!overlay) return;
+
+        // Render immediately from cached data, then subscribe for live updates
+        this._renderLeaderboardRows();
+
+        if (this._leaderboardUnsub) { this._leaderboardUnsub(); this._leaderboardUnsub = null; }
+        if (window.WordQuestFirebase && window.WordQuestFirebase.subscribeToLeaderboard) {
+            this._leaderboardUnsub = window.WordQuestFirebase.subscribeToLeaderboard((list) => {
+                if (Array.isArray(list)) this._renderLeaderboardRows(list);
+            });
+        }
+
+        // Backdrop click closes (guard so the listener only binds once)
+        if (!this._leaderboardBackdropBound) {
+            this._leaderboardBackdropBound = true;
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) this.closeLeaderboard();
+            });
+        }
+
+        overlay.classList.remove('hidden');
+    }
+
+    closeLeaderboard() {
+        const overlay = document.getElementById('leaderboard-overlay');
+        if (overlay) overlay.classList.add('hidden');
+        if (this._leaderboardUnsub) {
+            this._leaderboardUnsub();
+            this._leaderboardUnsub = null;
+        }
+    }
+
+    _renderLeaderboardRows(list) {
+        const container = document.getElementById('game-lb-list');
+        if (!container) return;
+
+        let arr;
+        try {
+            arr = (list && Array.isArray(list))
+                ? list
+                : JSON.parse(localStorage.getItem('wordQuest_leaderboard') || '[]');
+        } catch (e) {
+            arr = [];
+        }
+
+        if (arr.length === 0) {
+            container.innerHTML = '<div class="lb-empty">No scores yet! Be the first to play.</div>';
+            return;
+        }
+
+        const myRoll = localStorage.getItem('wordQuest_rollNumber') || '';
+        const total = (r) => Math.max(Number(r.cumulativeScore) || 0, Number(r.score) || 0);
+        const seen = new Set();
+        const deduped = [];
+        arr.forEach((item) => {
+            const key = item.id || item.rollNumber || null;
+            if (key !== null && seen.has(key)) return;
+            if (key !== null) seen.add(key);
+            deduped.push(item);
+        });
+        deduped.sort((a, b) => total(b) - total(a));
+
+        const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+            c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+
+        const top = deduped.slice(0, 10);
+        container.innerHTML = top.map((item, index) => {
+            const rank = index + 1;
+            const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : String(rank);
+            const dept = (item.department || '').replace('Department of ', '') || '—';
+            const isMe = myRoll && String(item.rollNumber) === String(myRoll);
+            return `
+                <div class="lb-row ${isMe ? 'lb-row-me' : ''}">
+                    <span class="lb-rank">${medal}</span>
+                    <span class="lb-name">${esc(item.name || 'Anonymous')}</span>
+                    <span class="lb-dept">${esc(dept)}</span>
+                    <span class="lb-score">${total(item)}</span>
+                </div>`;
+        }).join('');
+
+        if (container.scrollTop) container.scrollTop = 0;
     }
 
     /* ── ADMIN MESSAGE POPUP ─────────────────────
@@ -1567,12 +1680,15 @@ const WS = new WordSearch();
  * within 3 seconds (offline / blocked).
  */
 function bootGame() {
+    // Flag for index.html: when the player returns from game.html, reveal the leaderboard
+    try { window.sessionStorage.setItem('wordQuest_showLeaderboard', '1'); } catch (e) {}
+
     function startBoot() {
         if (window.WordQuestFirebase && window.WordQuestFirebase.getGameStateFromFirestore) {
             window.WordQuestFirebase.getGameStateFromFirestore().then((isActive) => {
                 if (!isActive) {
-                    alert('⛔ The game has been Ended by the Admin. Access to game.html is closed right now.');
-                    window.location.href = 'index.html';
+                    WS._loadCumulativeScore();
+                    WS._showGameEndedScreen();
                     return;
                 }
                 WS.init();

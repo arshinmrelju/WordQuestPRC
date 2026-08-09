@@ -1712,6 +1712,34 @@ body {
     }
 }
 
+/* Gold ring pulse — briefly draws attention to the leaderboard when
+   the player returns from game.html */
+.lb-flash {
+    animation: lbFlashRing 2.2s ease;
+}
+
+@keyframes lbFlashRing {
+    0% {
+        box-shadow: 0 0 0 0 rgba(217, 119, 6, 0);
+    }
+
+    18% {
+        box-shadow: 0 0 0 14px rgba(217, 119, 6, 0);
+    }
+
+    20% {
+        box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.7), 0 0 30px rgba(217, 119, 6, 0.35);
+    }
+
+    80% {
+        box-shadow: 0 0 0 14px rgba(217, 119, 6, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(217, 119, 6, 0);
+    }
+}
+
 /* --------------------------------------------------------------------------
    13. COMPACT MOBILE MEDIA QUERIES (320px to 640px)
    -------------------------------------------------------------------------- */

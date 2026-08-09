@@ -591,6 +591,109 @@
     word-break: break-word;
 }
 
+/* Game Ended by Admin popup */
+.ended-dialog {
+    border-color: rgba(239, 68, 68, 0.45);
+    box-shadow: var(--shadow-card), 0 0 24px rgba(239, 68, 68, 0.3);
+}
+.ended-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    margin-top: 0.25rem;
+}
+
+/* In-game Leaderboard popup */
+.leaderboard-dialog {
+    max-width: 500px;
+    border-color: rgba(217, 119, 6, 0.4);
+    box-shadow: var(--shadow-card), 0 0 24px rgba(217, 119, 6, 0.25);
+}
+.leaderboard-dialog-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(217, 119, 6, 0.12);
+    color: #d97706;
+    margin-top: 0.25rem;
+}
+.lb-list-wrap {
+    width: 100%;
+    max-width: 440px;
+    max-height: 46vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.15rem;
+    -webkit-overflow-scrolling: touch;
+}
+.lb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.lb-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.55rem 0.9rem;
+    background: rgba(15, 23, 42, 0.05);
+    border: 1px solid var(--card-border-gold);
+    border-radius: var(--radius-md);
+}
+.lb-row-me {
+    background: rgba(217, 119, 6, 0.13);
+    border-color: rgba(217, 119, 6, 0.5);
+    box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.35);
+}
+.lb-rank {
+    font-family: var(--font-title);
+    font-weight: 800;
+    min-width: 1.8rem;
+    text-align: center;
+    color: var(--accent-gold-light);
+}
+.lb-name {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+.lb-dept {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+.lb-score {
+    font-family: var(--font-title);
+    font-weight: 800;
+    color: var(--accent-gold-light);
+    min-width: 3rem;
+    text-align: right;
+}
+.lb-empty {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
 .score-showcase {
     display: flex;
     flex-direction: column;

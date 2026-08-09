@@ -544,9 +544,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ------------------------------------------------------------------
+    // 11b. When the player returns from game.html, reveal the leaderboard
+    // ------------------------------------------------------------------
+    function maybeRevealLeaderboard() {
+        let show = false;
+        try { show = sessionStorage.getItem('wordQuest_showLeaderboard') === '1'; } catch (e) {}
+        try { sessionStorage.removeItem('wordQuest_showLeaderboard'); } catch (e) {}
+        if (!show) return;
+
+        // Let the card-entrance animations settle, then bring the freshest scores into view
+        setTimeout(() => {
+            const card = document.getElementById('leaderboard-card');
+            if (!card) return;
+            renderLeaderboardRows();
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.remove('lb-flash');
+            void card.offsetWidth;
+            card.classList.add('lb-flash');
+            setTimeout(() => card.classList.remove('lb-flash'), 2600);
+        }, 700);
+    }
+
     initFloatingLetters();
     restoreSession();
     renderLeaderboardRows();
     subscribeLeaderboard();
+    maybeRevealLeaderboard();
     clearIndexActiveState();
 });
