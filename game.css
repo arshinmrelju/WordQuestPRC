@@ -57,6 +57,10 @@
     font-size: 0.78rem;
     font-weight: 600;
     color: var(--text-primary);
+    max-width: 3.4rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .player-badge-sep {
     font-size: 0.7rem;

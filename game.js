@@ -1453,11 +1453,10 @@ class WordSearch {
         if (!nameEl || !deptEl) return;
         const name = localStorage.getItem('wordQuest_playerName') || 'Player';
         const dept = localStorage.getItem('wordQuest_department') || '—';
+        nameEl.textContent = name.length > 5 ? name.slice(0, 5).trimEnd() + '.' : name;
         if (dept.startsWith('Department of ')) {
-            nameEl.textContent = name;
             deptEl.textContent = dept.replace('Department of ', '');
         } else {
-            nameEl.textContent = name;
             deptEl.textContent = dept;
         }
     }
