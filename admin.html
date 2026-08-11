@@ -21,6 +21,24 @@
     <!-- Background Grid Mesh -->
     <div class="bg-grid-mesh" aria-hidden="true"></div>
 
+    <!-- Admin Access Code Gate -->
+    <div id="admin-login-gate" class="admin-login-overlay">
+        <div class="glass-card admin-login-card animate-scale-up">
+            <div class="admin-login-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h1 class="admin-login-title">Word <span class="gold-text">Quest</span></h1>
+            <p class="admin-login-subtitle">Admin Access Required</p>
+            <p class="admin-login-desc">Enter the access code to open the control panel.</p>
+
+            <input type="password" id="admin-code-input" class="glass-input admin-code-input" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+
+            <button type="button" id="admin-code-submit" class="glass-btn btn-primary admin-login-btn">Unlock Panel</button>
+
+            <p id="admin-code-error" class="admin-login-error hidden">Incorrect code. Please try again.</p>
+        </div>
+    </div>
+
     <div class="admin-app-container">
 
         <!-- Top Header Navigation -->
@@ -153,6 +171,10 @@
                             <span class="tab-badge" id="badge-leaderboard-count">0</span>
                         </button>
                     </div>
+                    <button type="button" id="btn-preview-leaderboard" class="glass-btn btn-secondary btn-sm hidden" title="Present leaderboard in full-screen mode" aria-label="Present leaderboard">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                        <span>Present</span>
+                    </button>
                 </div>
 
                 <!-- Filters & Controls Bar -->
@@ -374,6 +396,52 @@
             <div class="msg-compose-actions">
                 <button type="button" id="msg-compose-send" class="glass-btn btn-primary">Send</button>
                 <button type="button" id="msg-compose-cancel" class="glass-btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaderboard Full-Screen Preview Modal -->
+    <div id="modal-leaderboard-preview" class="modal-overlay hidden">
+        <div class="glass-card leaderboard-preview-modal animate-scale-up">
+            <div class="spectate-header">
+                <div class="spectate-player-info">
+                    <span class="status-pill-live"><span class="live-pulse-dot"></span>LIVE LEADERBOARD</span>
+                    <h2 class="spectate-player-title">Word <span class="gold-text">Quest</span> — Leaderboard</h2>
+                    <div class="spectate-player-sub">English Department Carnival 2026</div>
+                </div>
+                <button type="button" id="close-leaderboard-preview" class="modal-close-btn" title="Lock & Close">&times;</button>
+            </div>
+
+            <div class="table-wrapper preview-table-wrapper">
+                <table class="admin-table preview-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Roll No</th>
+                            <th>Player Name</th>
+                            <th>Department</th>
+                            <th>Year</th>
+                            <th>Level</th>
+                            <th>Total Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-preview-body">
+                        <!-- Populated dynamically via admin.js -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Preview Lock Gate: enter access code to close -->
+        <div id="preview-lock-gate" class="preview-lock-overlay hidden">
+            <div class="glass-card preview-lock-card animate-scale-up">
+                <div class="admin-login-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
+                <h3 class="preview-lock-title">Enter Access Code to Close</h3>
+                <input type="password" id="preview-lock-code-input" class="glass-input admin-code-input" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+                <button type="button" id="preview-lock-submit" class="glass-btn btn-primary admin-login-btn">Close Preview</button>
+                <p id="preview-lock-error" class="admin-login-error hidden">Incorrect code. Please try again.</p>
             </div>
         </div>
     </div>

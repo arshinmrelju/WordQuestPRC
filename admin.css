@@ -2,6 +2,161 @@
    WORD QUEST — Admin Control Panel Stylesheet
    ========================================================================== */
 
+/* Admin Access Code Gate */
+.admin-login-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(10px);
+}
+
+.admin-login-overlay.hidden {
+    display: none !important;
+}
+
+.admin-login-card {
+    width: 100%;
+    max-width: 400px;
+    padding: 2.25rem 2rem !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+    border: 1px solid rgba(217, 119, 6, 0.35) !important;
+}
+
+.admin-login-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(217, 119, 6, 0.2), rgba(245, 158, 11, 0.3));
+    border: 1px solid rgba(217, 119, 6, 0.45);
+    color: var(--accent-gold-light);
+}
+
+.admin-login-title {
+    font-family: var(--font-heading);
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.admin-login-subtitle {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-gold);
+}
+
+.admin-login-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.admin-code-input {
+    width: 100%;
+    text-align: center;
+    font-size: 1.4rem;
+    letter-spacing: 0.6em;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    padding: 0.8rem 1rem;
+}
+
+.admin-login-btn {
+    width: 100%;
+    justify-content: center;
+}
+
+.admin-login-error {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #ef4444;
+    margin: 0;
+}
+
+.admin-login-error.hidden {
+    display: none;
+}
+
+/* Leaderboard Full-Screen Preview Modal */
+.leaderboard-preview-modal {
+    width: 100%;
+    max-width: 1000px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.97) !important;
+    border: 1px solid rgba(217, 119, 6, 0.35) !important;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.4);
+    padding: 1.5rem !important;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.preview-table-wrapper {
+    max-height: calc(90vh - 180px);
+    overflow-y: auto;
+}
+
+.preview-table th,
+.preview-table td {
+    font-size: 1rem;
+    padding: 0.9rem 1.1rem;
+}
+
+.preview-table tbody tr:hover {
+    background: rgba(212, 163, 62, 0.08);
+}
+
+/* Preview Lock Gate overlay (shown above the preview to close it) */
+.preview-lock-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.82);
+    backdrop-filter: blur(8px);
+    border-radius: var(--radius-lg);
+}
+
+.preview-lock-overlay.hidden {
+    display: none !important;
+}
+
+.preview-lock-card {
+    width: 100%;
+    max-width: 360px;
+    padding: 2rem 1.75rem !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+    border: 1px solid rgba(217, 119, 6, 0.35) !important;
+}
+
+.preview-lock-title {
+    font-family: var(--font-heading);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
 .admin-app-container {
     position: relative;
     z-index: 2;

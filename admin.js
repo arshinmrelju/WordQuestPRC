@@ -7,6 +7,176 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // ----------------------------------------------------------------------
+    // 0. Admin Access Code Authentication Gate
+    // ----------------------------------------------------------------------
+    const ADMIN_ACCESS_CODE = '673579';
+    const STORAGE_KEY_ADMIN_AUTH = 'wordQuest_adminAuthed';
+
+    const loginGate      = document.getElementById('admin-login-gate');
+    const loginCodeInput = document.getElementById('admin-code-input');
+    const loginSubmitBtn = document.getElementById('admin-code-submit');
+    const loginErrorEl   = document.getElementById('admin-code-error');
+
+    function isAdminAuthed() {
+        try { return sessionStorage.getItem(STORAGE_KEY_ADMIN_AUTH) === 'true'; } catch (e) { return false; }
+    }
+
+    function unlockAdminPanel() {
+        try { sessionStorage.setItem(STORAGE_KEY_ADMIN_AUTH, 'true'); } catch (e) {}
+        if (loginGate) loginGate.classList.add('hidden');
+        if (loginErrorEl) loginErrorEl.classList.add('hidden');
+        if (loginCodeInput) loginCodeInput.value = '';
+    }
+
+    function attemptLogin() {
+        const code = (loginCodeInput ? loginCodeInput.value : '').trim();
+        if (code === ADMIN_ACCESS_CODE) {
+            unlockAdminPanel();
+        } else {
+            if (loginErrorEl) loginErrorEl.classList.remove('hidden');
+            if (loginCodeInput) {
+                loginCodeInput.value = '';
+                loginCodeInput.focus();
+            }
+        }
+    }
+
+    if (loginSubmitBtn) loginSubmitBtn.addEventListener('click', attemptLogin);
+    if (loginCodeInput) {
+        loginCodeInput.addEventListener('input', () => {
+            // Auto-login once the full 6-digit code is entered
+            if (loginCodeInput.value.trim().length === ADMIN_ACCESS_CODE.length) {
+                attemptLogin();
+            }
+        });
+        loginCodeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                attemptLogin();
+            }
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // 0.5. Leaderboard Full-Screen Preview (code-locked close)
+    // ----------------------------------------------------------------------
+    const previewBtn        = document.getElementById('btn-preview-leaderboard');
+    const previewModal      = document.getElementById('modal-leaderboard-preview');
+    const previewCloseBtn   = document.getElementById('close-leaderboard-preview');
+    const previewBody       = document.getElementById('leaderboard-preview-body');
+    const previewLockGate   = document.getElementById('preview-lock-gate');
+    const previewLockInput  = document.getElementById('preview-lock-code-input');
+    const previewLockSubmit = document.getElementById('preview-lock-submit');
+    const previewLockError  = document.getElementById('preview-lock-error');
+
+    function openLeaderboardPreview() {
+        if (!previewBody) return;
+
+        // Build the same deduplicated + sorted ranking as the leaderboard tab
+        const bestByPlayer = {};
+        leaderboardList.forEach(record => {
+            const key = `${record.rollNumber || ''}|${record.department || ''}|${record.year || ''}`;
+            const existing = bestByPlayer[key];
+            const currCum = record.cumulativeScore || record.score || 0;
+            const existCum = existing ? (existing.cumulativeScore || existing.score || 0) : -1;
+            if (!existing || currCum > existCum) {
+                bestByPlayer[key] = record;
+            }
+        });
+        const ranked = Object.values(bestByPlayer).sort((a, b) => {
+            const totalA = Math.max(a.cumulativeScore || 0, a.score || 0);
+            const totalB = Math.max(b.cumulativeScore || 0, b.score || 0);
+            if (totalB !== totalA) return totalB - totalA;
+            return (b.score || 0) - (a.score || 0);
+        });
+
+        previewBody.innerHTML = '';
+        if (ranked.length === 0) {
+            previewBody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">
+                        No leaderboard scores recorded yet.
+                    </td>
+                </tr>`;
+        } else {
+            ranked.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                const playerDoc = playersList.find(p => p.rollNumber && p.rollNumber === item.rollNumber) || {};
+                const lvlNum = item.currentLevel || playerDoc.currentLevel || 1;
+                const lvlTitle = item.levelTitle || playerDoc.levelTitle || 'Novice';
+
+                let rankHtml = `${idx + 1}`;
+                if (idx === 0) rankHtml = medalSvg('gold', '1');
+                else if (idx === 1) rankHtml = medalSvg('silver', '2');
+                else if (idx === 2) rankHtml = medalSvg('bronze', '3');
+
+                tr.innerHTML = `
+                    <td><strong>${rankHtml}</strong></td>
+                    <td><strong class="gold-text">${escapeHtml(item.rollNumber || '—')}</strong></td>
+                    <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
+                    <td>${escapeHtml((item.department || '—').replace('Department of ', ''))}</td>
+                    <td><span class="diff-chip diff-medium">${escapeHtml(item.year || '—')}</span></td>
+                    <td>${getLevelBadgeHtml(lvlNum, lvlTitle)}</td>
+                    <td><span class="cum-score">${Math.max(item.cumulativeScore || 0, item.score || 0)}</span></td>
+                `;
+                previewBody.appendChild(tr);
+            });
+        }
+
+        if (previewModal) previewModal.classList.remove('hidden');
+    }
+
+    function closeLeaderboardPreview() {
+        if (previewModal) previewModal.classList.add('hidden');
+        if (previewLockGate) previewLockGate.classList.add('hidden');
+        if (previewLockInput) previewLockInput.value = '';
+        if (previewLockError) previewLockError.classList.add('hidden');
+    }
+
+    function attemptPreviewUnlock() {
+        const code = (previewLockInput ? previewLockInput.value : '').trim();
+        if (code === ADMIN_ACCESS_CODE) {
+            closeLeaderboardPreview();
+        } else {
+            if (previewLockError) previewLockError.classList.remove('hidden');
+            if (previewLockInput) {
+                previewLockInput.value = '';
+                previewLockInput.focus();
+            }
+        }
+    }
+
+    if (previewBtn) {
+        previewBtn.addEventListener('click', openLeaderboardPreview);
+    }
+    if (previewCloseBtn) {
+        previewCloseBtn.addEventListener('click', () => {
+            if (previewLockGate) previewLockGate.classList.remove('hidden');
+            if (previewLockError) previewLockError.classList.add('hidden');
+            if (previewLockInput) {
+                previewLockInput.value = '';
+                previewLockInput.focus();
+            }
+        });
+    }
+    if (previewLockSubmit) {
+        previewLockSubmit.addEventListener('click', attemptPreviewUnlock);
+    }
+    if (previewLockInput) {
+        previewLockInput.addEventListener('input', () => {
+            if (previewLockInput.value.trim().length === ADMIN_ACCESS_CODE.length) {
+                attemptPreviewUnlock();
+            }
+        });
+        previewLockInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                attemptPreviewUnlock();
+            }
+        });
+    }
+
     // Default initial word bank if none saved
     const DEFAULT_WORD_BANK = [
         'ALLEGORY', 'ALLITERATION', 'ALLUSION', 'ANAPHORA', 'ANTAGONIST',
@@ -99,6 +269,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (viewPlayersTable)     viewPlayersTable.classList.toggle('hidden', tab !== 'players');
         if (viewLiveTable)        viewLiveTable.classList.toggle('hidden', tab !== 'live');
         if (viewLeaderboardTable) viewLeaderboardTable.classList.toggle('hidden', tab !== 'leaderboard');
+
+        // Preview button only appears on the Leaderboard tab
+        if (previewBtn) previewBtn.classList.toggle('hidden', tab !== 'leaderboard');
 
         renderCurrentTab();
     }
@@ -1200,5 +1373,13 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPlayersTable();
     renderWordTags();
     initFirebaseSync();
+
+    // Show the access gate unless the session is already authenticated
+    if (!isAdminAuthed() && loginGate) {
+        loginGate.classList.remove('hidden');
+        if (loginCodeInput) loginCodeInput.focus();
+    } else if (loginGate) {
+        loginGate.classList.add('hidden');
+    }
 });
 
