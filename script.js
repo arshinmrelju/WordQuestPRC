@@ -54,6 +54,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const KEY_DEPARTMENT = 'wordQuest_department';
     const KEY_YEAR       = 'wordQuest_yearOfStudy';
     const KEY_PLAYER_ID  = 'wordQuest_playerFirestoreId';
+    const KEY_RULES_ACCEPTED_PREFIX = 'wordQuest_rulesAccepted_';
+
+    // Rules modal DOM
+    const rulesModal       = document.getElementById('rules-modal');
+    const rulesScroller    = document.getElementById('rules-scroll-container');
+    const rulesScrollHint  = document.getElementById('rules-scroll-hint');
+    const rulesMasterWrap  = document.getElementById('rules-master-checkbox-wrapper');
+    const ruleCheckAll     = document.getElementById('rule-check-all');
+    const rulesConfirmBtn  = document.getElementById('rules-confirm-btn');
+    const rulesCloseX      = document.getElementById('rules-close-x');
+    const rulesAgreeError  = document.getElementById('rules-agree-error');
+    let pendingRegData     = null;
+    let rulesAcceptedShown = false;
+    let rulesScrolledFully = false;
 
     // ------------------------------------------------------------------
     // 2. Floating Background Letters
@@ -113,6 +127,155 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (alreadyRegToggle) alreadyRegToggle.addEventListener('click', showReturningForm);
     if (retBackBtn)       retBackBtn.addEventListener('click', showNewForm);
+
+    // ------------------------------------------------------------------
+    // 4b. Rules & Regulations modal logic (bank-style checkbox system)
+    // ------------------------------------------------------------------
+    function resetRulesCheckboxes() {
+        rulesScrolledFully = false;
+        if (ruleCheckAll) { ruleCheckAll.disabled = true; ruleCheckAll.checked = false; }
+        if (rulesConfirmBtn) rulesConfirmBtn.disabled = true;
+        if (rulesAgreeError) { rulesAgreeError.textContent = ''; rulesAgreeError.classList.remove('visible'); }
+        if (rulesScrollHint) rulesScrollHint.classList.remove('rules-unlocked');
+        if (rulesScroller) rulesScroller.classList.remove('rules-fully-scrolled');
+        if (rulesMasterWrap) {
+            rulesMasterWrap.classList.remove('checkbox-enabled');
+            rulesMasterWrap.classList.add('checkbox-locked');
+        }
+        const label = rulesMasterWrap ? rulesMasterWrap.querySelector('.checkbox-master-label') : null;
+        if (label) label.classList.remove('has-ticked');
+    }
+
+    function markRulesFullyScrolled() {
+        if (rulesScrolledFully) return;
+        rulesScrolledFully = true;
+        if (rulesScroller) rulesScroller.classList.add('rules-fully-scrolled');
+        if (rulesScrollHint) rulesScrollHint.classList.add('rules-unlocked');
+        if (rulesMasterWrap) {
+            rulesMasterWrap.classList.remove('checkbox-locked');
+            rulesMasterWrap.classList.add('checkbox-enabled');
+        }
+        if (ruleCheckAll) ruleCheckAll.disabled = false;
+        syncConfirmButton();
+    }
+
+    function isAtScrollBottom(el, tolerance = 8) {
+        if (!el) return true;
+        return el.scrollTop + el.clientHeight >= el.scrollHeight - tolerance;
+    }
+
+    function initScrollGate() {
+        if (!rulesScroller) { markRulesFullyScrolled(); return; }
+        rulesScroller.addEventListener('scroll', () => {
+            if (isAtScrollBottom(rulesScroller)) markRulesFullyScrolled();
+        }, { passive: true });
+        setTimeout(() => {
+            if (rulesScroller.scrollHeight <= rulesScroller.clientHeight + 6) {
+                markRulesFullyScrolled();
+            }
+        }, 80);
+    }
+
+    function allRuleChecksSelected() {
+        return !!(ruleCheckAll && ruleCheckAll.checked);
+    }
+
+    function syncConfirmButton() {
+        const ok = rulesScrolledFully && allRuleChecksSelected();
+        if (rulesConfirmBtn) rulesConfirmBtn.disabled = !ok;
+        if (ok && rulesAgreeError) {
+            rulesAgreeError.textContent = '';
+            rulesAgreeError.classList.remove('visible');
+        }
+    }
+
+    function initRulesCheckboxesSync() {
+        initScrollGate();
+        if (ruleCheckAll) {
+            ruleCheckAll.addEventListener('change', () => {
+                const label = rulesMasterWrap ? rulesMasterWrap.querySelector('.checkbox-master-label') : null;
+                if (ruleCheckAll.checked && label) label.classList.add('has-ticked');
+                else if (label) label.classList.remove('has-ticked');
+                syncConfirmButton();
+            });
+        }
+        if (rulesMasterWrap) {
+            rulesMasterWrap.addEventListener('click', (e) => {
+                if (!rulesScrolledFully) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    rulesMasterWrap.classList.remove('shake');
+                    void rulesMasterWrap.offsetWidth;
+                    rulesMasterWrap.classList.add('shake');
+                    setTimeout(() => rulesMasterWrap.classList.remove('shake'), 400);
+                    if (rulesAgreeError) {
+                        rulesAgreeError.textContent = '⚠️ Scroll through all rules first to unlock the checkbox.';
+                        rulesAgreeError.classList.add('visible');
+                    }
+                    if (rulesScroller) {
+                        rulesScroller.scrollTo({ top: rulesScroller.scrollHeight, behavior: 'smooth' });
+                    }
+                }
+            }, true);
+        }
+    }
+
+    function showRulesModal(regData) {
+        if (!rulesModal) { pendingRegData = regData; proceedWithRegistration(); return; }
+        pendingRegData = regData;
+        resetRulesCheckboxes();
+        rulesModal.classList.remove('hidden');
+        rulesAcceptedShown = true;
+        setTimeout(() => {
+            if (rulesScroller) rulesScroller.scrollTop = 0;
+            if (rulesScroller && rulesScroller.scrollHeight <= rulesScroller.clientHeight + 6) {
+                markRulesFullyScrolled();
+            }
+        }, 30);
+    }
+
+    function hideRulesModal() {
+        if (!rulesModal) return;
+        rulesModal.classList.add('hidden');
+        pendingRegData = null;
+    }
+
+    initRulesCheckboxesSync();
+    if (rulesCloseX) rulesCloseX.addEventListener('click', () => {
+        hideRulesModal();
+        if (startBtn) {
+            startBtn.disabled = false;
+            const t = startBtn.querySelector('.btn-text');
+            if (t) t.textContent = 'Begin Quest';
+        }
+    });
+    if (rulesConfirmBtn) {
+        rulesConfirmBtn.addEventListener('click', () => {
+            if (!allRuleChecksSelected()) {
+                if (rulesAgreeError) {
+                    rulesAgreeError.textContent = '⚠️ Please accept all Rules & Regulations to continue.';
+                    rulesAgreeError.classList.add('visible');
+                }
+                if (rulesModal) {
+                    const card = rulesModal.querySelector('.modal-card');
+                    if (card) {
+                        card.classList.remove('shake');
+                        void card.offsetWidth;
+                        card.classList.add('shake');
+                        setTimeout(() => card.classList.remove('shake'), 500);
+                    }
+                }
+                return;
+            }
+            const data = pendingRegData;
+            if (data) {
+                const key = KEY_RULES_ACCEPTED_PREFIX + data.roll + '|' + data.dept + '|' + data.year;
+                try { localStorage.setItem(key, String(Date.now())); } catch (e) {}
+            }
+            hideRulesModal();
+            proceedWithRegistration();
+        });
+    }
 
     // ------------------------------------------------------------------
     // 5. Inline validation helpers — clear errors on input
@@ -253,8 +416,68 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ------------------------------------------------------------------
-    // 9. NEW REGISTRATION form submit
+    // 9. NEW REGISTRATION form submit (Rules & Regs gated)
     // ------------------------------------------------------------------
+    function proceedWithRegistration() {
+        const data = pendingRegData || {};
+        const name  = data.name  || (playerNameInput  ? playerNameInput.value  : '').trim();
+        const phone = data.phone || (playerPhoneInput ? playerPhoneInput.value : '').trim();
+        const roll  = data.roll  || (rollNumberInput  ? rollNumberInput.value  : '').trim().toUpperCase();
+        const dept  = data.dept  || (departmentSelect ? departmentSelect.value : '');
+        const year  = data.year  || (yearSelect       ? yearSelect.value       : '');
+
+        saveToStorage(name, roll, dept, year, phone);
+
+        if (startBtn) {
+            startBtn.disabled = true;
+            const t = startBtn.querySelector('.btn-text');
+            if (t) t.textContent = 'Checking...';
+        }
+
+        const resetFreshProgression = () => {
+            try {
+                const freshKey = `${roll}|${dept}|${year}`;
+                localStorage.removeItem('wordQuest_level_' + freshKey);
+                localStorage.removeItem('wordQuest_cumulative_' + freshKey);
+                localStorage.removeItem('wordQuest_cumulative_' + roll);
+                localStorage.removeItem('wordQuest_history_' + roll);
+                localStorage.removeItem('wordQuest_usedWords_' + freshKey);
+            } catch (e) { /* noop */ }
+        };
+
+        waitForFirebase(async (fb) => {
+            if (fb && fb.getPlayerByRollNumber) {
+                try {
+                    const existing = await fb.getPlayerByRollNumber(roll, dept, year);
+                    if (existing) {
+                        saveToStorage(
+                            existing.name || name,
+                            roll, dept, year,
+                            existing.phoneNumber || phone
+                        );
+                        localStorage.setItem(KEY_PLAYER_ID, existing.id);
+                        showWelcomeBackModal(existing);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('Existing-player lookup error:', e);
+                }
+            }
+
+            resetFreshProgression();
+            const doRegister = fb && fb.registerPlayer
+                ? fb.registerPlayer({ name, phoneNumber: phone, rollNumber: roll, department: dept, year })
+                : Promise.resolve(null);
+
+            doRegister.then((docId) => {
+                if (docId) localStorage.setItem(KEY_PLAYER_ID, docId);
+                launchGame(null);
+            }).catch(() => {
+                launchGame(null);
+            });
+        });
+    }
+
     if (playerForm) {
         playerForm.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -290,63 +513,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (hasError) { triggerShake(); return; }
 
-            // Save locally right away so game.js can read it even if Firebase is slow
-            saveToStorage(name, roll, dept, year, phone);
+            const regData = { name, phone, roll, dept, year };
+            const rulesKey = KEY_RULES_ACCEPTED_PREFIX + roll + '|' + dept + '|' + year;
+            let alreadyAccepted = false;
+            try { alreadyAccepted = !!localStorage.getItem(rulesKey); } catch (e) {}
 
-            // Disable button, show loading state
-            if (startBtn) {
-                startBtn.disabled = true;
-                const t = startBtn.querySelector('.btn-text');
-                if (t) t.textContent = 'Checking...';
-            }
-
-            // Fresh registration — reset stale progression left by a previous player on this device
-            // so a genuinely new player always starts at Level 1 / zero cumulative score.
-            const resetFreshProgression = () => {
-                try {
-                    const freshKey = `${roll}|${dept}|${year}`;
-                    localStorage.removeItem('wordQuest_level_' + freshKey);
-                    localStorage.removeItem('wordQuest_cumulative_' + freshKey);
-                    localStorage.removeItem('wordQuest_cumulative_' + roll);
-                    localStorage.removeItem('wordQuest_history_' + roll);
-                    localStorage.removeItem('wordQuest_usedWords_' + freshKey);
-                } catch (e) { /* noop */ }
-            };
-
-            waitForFirebase(async (fb) => {
-                // If this roll + dept + year is already registered, log into the existing account
-                // instead of wiping their progress with a fresh registration.
-                if (fb && fb.getPlayerByRollNumber) {
-                    try {
-                        const existing = await fb.getPlayerByRollNumber(roll, dept, year);
-                        if (existing) {
-                            saveToStorage(
-                                existing.name || name,
-                                roll, dept, year,
-                                existing.phoneNumber || phone
-                            );
-                            localStorage.setItem(KEY_PLAYER_ID, existing.id);
-                            showWelcomeBackModal(existing);
-                            return;
-                        }
-                    } catch (e) {
-                        console.warn('Existing-player lookup error:', e);
-                    }
+            if (alreadyAccepted) {
+                pendingRegData = regData;
+                proceedWithRegistration();
+            } else {
+                if (startBtn) {
+                    startBtn.disabled = true;
+                    const t = startBtn.querySelector('.btn-text');
+                    if (t) t.textContent = 'Review Rules...';
                 }
-
-                // Fresh registration (also the Firebase-unavailable / lookup-error fallback)
-                resetFreshProgression();
-                const doRegister = fb && fb.registerPlayer
-                    ? fb.registerPlayer({ name, phoneNumber: phone, rollNumber: roll, department: dept, year })
-                    : Promise.resolve(null);
-
-                doRegister.then((docId) => {
-                    if (docId) localStorage.setItem(KEY_PLAYER_ID, docId);
-                    launchGame(null);
-                }).catch(() => {
-                    launchGame(null);
-                });
-            });
+                showRulesModal(regData);
+            }
         });
     }
 
