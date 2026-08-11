@@ -1,6 +1,6 @@
 /**
  * WORD QUEST — Admin Control Panel Logic (admin.js)
- * Manages player registrations, leaderboard scores, CSV exports, stats calculations,
+ * Manages player registrations, leaderboard scores, PDF exports, stats calculations,
  * and custom word bank management.
  */
 
@@ -332,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const leaderboardTableBody = document.getElementById('admin-leaderboard-table-body');
 
     // DOM Elements - Action Buttons
-    const exportBtn    = document.getElementById('export-csv-btn');
+    const exportBtn    = document.getElementById('export-pdf-btn');
     const clearBtn     = document.getElementById('clear-data-btn');
     const addWordForm  = document.getElementById('add-word-form');
     const newWordInput = document.getElementById('new-word-input');
@@ -1182,79 +1182,210 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 7. CSV Export Functionality
+    // 7. PDF Export Functionality (Preview modal + Download)
     // ----------------------------------------------------------------------
-    function exportToCSV() {
-        let csvContent = 'data:text/csv;charset=utf-8,';
+    const pdfPreviewModal    = document.getElementById('modal-pdf-preview');
+    const pdfPreviewFrame    = document.getElementById('pdf-preview-frame');
+    const pdfPreviewTitle    = document.getElementById('pdf-preview-title');
+    const pdfPreviewSub      = document.getElementById('pdf-preview-sub');
+    const pdfPreviewClose    = document.getElementById('close-pdf-preview');
+    const pdfPreviewCancel   = document.getElementById('pdf-preview-cancel');
+    const pdfPreviewDownload = document.getElementById('pdf-preview-download');
+
+    let pendingPdfBlobUrl = null;
+    let pendingPdfDoc     = null;
+    let pendingPdfFileName = '';
+
+    function buildExportPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+
+        let title, subtitle, head, body;
 
         if (currentTab === 'players') {
             if (playersList.length === 0) {
                 alert('No registered players to export.');
-                return;
+                return null;
             }
-            csvContent += 'Roll Number,Player Name,Status,Current Level,Level Title,Phone Number,Department,Year of Study,Registered Date\n';
-            playersList.forEach(p => {
-                const roll   = `"${(p.rollNumber   || '').replace(/"/g, '""')}"`;
-                const name   = `"${(p.name         || '').replace(/"/g, '""')}"`;
-                const status = `"${p.active === true ? 'LIVE' : 'Offline'}"`;
-                const lvl    = `"${p.currentLevel   || 1}"`;
-                const title  = `"${(p.levelTitle   || 'Novice').replace(/"/g, '""')}"`;
-                const phone  = `"${(p.phoneNumber  || '').replace(/"/g, '""')}"`;
-                const dept   = `"${(p.department   || '').replace(/"/g, '""')}"`;
-                const year   = `"${(p.year         || '').replace(/"/g, '""')}"`;
-                const date   = `"${(p.dateDisplay  || '').replace(/"/g, '""')}"`;
-                csvContent += `${roll},${name},${status},${lvl},${title},${phone},${dept},${year},${date}\n`;
-            });
+            title = 'Word Quest — Registered Players';
+            subtitle = 'English Department Carnival 2026';
+            head = [['#', 'Roll Number', 'Player Name', 'Status', 'Level', 'Level Title', 'Phone Number', 'Department', 'Year', 'Registered Date']];
+            body = playersList.map((p, idx) => [
+                idx + 1,
+                p.rollNumber   || '',
+                p.name         || '',
+                p.active === true ? 'LIVE' : 'Offline',
+                p.currentLevel || 1,
+                p.levelTitle   || 'Novice',
+                p.phoneNumber  || '',
+                p.department   || '',
+                p.year         || '',
+                p.dateDisplay  || ''
+            ]);
         } else if (currentTab === 'live') {
             const livePlayers = deduplicatePlayers(playersList).filter(p => p.active === true);
             if (livePlayers.length === 0) {
                 alert('No live players currently online to export.');
-                return;
+                return null;
             }
-            csvContent += 'Roll Number,Player Name,Status,Current Level,Level Title,Round Score,Total Score,Department,Year of Study,Phone Number\n';
-            livePlayers.forEach(p => {
-                const roll   = `"${(p.rollNumber   || '').replace(/"/g, '""')}"`;
-                const name   = `"${(p.name         || '').replace(/"/g, '""')}"`;
-                const status = `"LIVE NOW"`;
-                const lvl    = `"${p.currentLevel   || 1}"`;
-                const title  = `"${(p.levelTitle   || 'Novice').replace(/"/g, '""')}"`;
-                const rScore = p.score || 0;
-                const tScore = p.cumulativeScore || p.score || 0;
-                const dept   = `"${(p.department   || '').replace(/"/g, '""')}"`;
-                const year   = `"${(p.year         || '').replace(/"/g, '""')}"`;
-                const phone  = `"${(p.phoneNumber  || '').replace(/"/g, '""')}"`;
-                csvContent += `${roll},${name},${status},${lvl},${title},${rScore},${tScore},${dept},${year},${phone}\n`;
-            });
+            title = 'Word Quest — Live Players';
+            subtitle = 'English Department Carnival 2026';
+            head = [['#', 'Roll Number', 'Player Name', 'Status', 'Level', 'Level Title', 'Round Score', 'Total Score', 'Department', 'Year', 'Phone Number']];
+            body = livePlayers.map((p, idx) => [
+                idx + 1,
+                p.rollNumber   || '',
+                p.name         || '',
+                'LIVE NOW',
+                p.currentLevel || 1,
+                p.levelTitle   || 'Novice',
+                p.score || 0,
+                p.cumulativeScore || p.score || 0,
+                p.department   || '',
+                p.year         || '',
+                p.phoneNumber  || ''
+            ]);
         } else {
             if (leaderboardList.length === 0) {
                 alert('No leaderboard records to export.');
-                return;
+                return null;
             }
-            csvContent += 'Rank,Roll Number,Player Name,Department,Year of Study,Level Reached,Score,Total Score,Date\n';
-            leaderboardList.forEach((r, idx) => {
+            title = 'Word Quest — Leaderboard';
+            subtitle = 'English Department Carnival 2026';
+            head = [['Rank', 'Roll Number', 'Player Name', 'Department', 'Year', 'Level Reached', 'Score', 'Total Score', 'Date']];
+            body = leaderboardList.map((r, idx) => {
                 const playerDoc = playersList.find(p => p.rollNumber && p.rollNumber === r.rollNumber) || {};
-                const roll  = `"${(r.rollNumber || '').replace(/"/g, '""')}"`;
-                const name  = `"${(r.name || '').replace(/"/g, '""')}"`;
-                const dept  = `"${(r.department || '').replace(/"/g, '""')}"`;
-                const year  = `"${(r.year || '').replace(/"/g, '""')}"`;
-                const lvl   = `"${r.currentLevel || playerDoc.currentLevel || 1} (${r.levelTitle || playerDoc.levelTitle || 'Novice'})"`;
-                const score = r.score || 0;
-                const total = r.cumulativeScore || r.score || 0;
-                const date  = `"${(r.date || '').replace(/"/g, '""')}"`;
-                csvContent += `${idx + 1},${roll},${name},${dept},${year},${lvl},${score},${total},${date}\n`;
+                return [
+                    idx + 1,
+                    r.rollNumber || '',
+                    r.name || '',
+                    r.department || '',
+                    r.year || '',
+                    `${r.currentLevel || playerDoc.currentLevel || 1} (${r.levelTitle || playerDoc.levelTitle || 'Novice'})`,
+                    r.score || 0,
+                    r.cumulativeScore || r.score || 0,
+                    r.date || ''
+                ];
             });
         }
 
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `WordQuest_${currentTab.toUpperCase()}_PLAYERS_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 40;
+
+        // ---- Branded header band (shared vertical center = bandCenter) ----
+        const bandH = 132;
+        const bandCenter = bandH / 2;
+        doc.setFillColor(30, 41, 59);            // dark slate
+        doc.rect(0, 0, pageWidth, bandH, 'F');
+        doc.setFillColor(217, 119, 6);           // gold accent strip
+        doc.rect(0, bandH, pageWidth, 4, 'F');
+
+        // College logo — placed directly on the band (no white tile)
+        const college = window.WQ_REPORT_LOGOS && window.WQ_REPORT_LOGOS.collegeLogo;
+        const collegeW = 46, collegeH = 65;
+        if (college) {
+            try { doc.addImage(college, 'PNG', 30, bandCenter - collegeH / 2, collegeW, collegeH); } catch (e) { /* skip logo if invalid */ }
+        }
+
+        // Word Quest app logo (actual favicon image)
+        const appLogo = window.WQ_REPORT_LOGOS && window.WQ_REPORT_LOGOS.appLogo;
+        const emX = college ? 30 + collegeW + 20 : 40;
+        const emS = 52, emY = bandCenter - emS / 2;
+        if (appLogo) {
+            try { doc.addImage(appLogo, 'PNG', emX, emY, emS, emS); } catch (e) { /* skip logo if invalid */ }
+        }
+
+        // Title block — vertically centered on bandCenter, aligned to emblem
+        const titleX = emX + emS + 20;
+        doc.setFontSize(9);
+        doc.setTextColor(217, 119, 6);
+        doc.text('WORD QUEST ADMIN PANEL', titleX, bandCenter - 17);
+
+        doc.setFontSize(21);
+        doc.setTextColor(255, 255, 255);
+        doc.text(title, titleX, bandCenter + 8);
+
+        doc.setFontSize(10);
+        doc.setTextColor(203, 213, 225);
+        doc.text(subtitle, titleX, bandCenter + 26);
+
+        // Right-aligned event / timestamp — vertically centered on bandCenter
+        const exportedAt = new Date().toLocaleString();
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(255, 255, 255);
+        doc.text('ENGLISH DEPARTMENT', pageWidth - margin, bandCenter - 17, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(148, 163, 184);
+        doc.text('CARNIVAL 2026', pageWidth - margin, bandCenter + 2, { align: 'right' });
+        doc.text(`Exported: ${exportedAt}`, pageWidth - margin, bandCenter + 20, { align: 'right' });
+
+        // ---- Meta strip under header ----
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(148, 113, 13);
+        doc.text(`REPORT: ${title.toUpperCase()}`, margin, 150);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Total Records: ${body.length}`, pageWidth - margin, 150, { align: 'right' });
+
+        // ---- Themed data table ----
+        doc.autoTable({
+            head: head,
+            body: body,
+            startY: 160,
+            margin: { left: margin, right: margin, top: 140, bottom: 60 },
+            styles: { fontSize: 8, cellPadding: 5, textColor: [51, 65, 85] },
+            headStyles: { fillColor: [217, 119, 6], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
+            alternateRowStyles: { fillColor: [250, 245, 235] },
+            didDrawPage: (data) => {
+                const pageCount = doc.internal.getNumberOfPages();
+                doc.setDrawColor(203, 213, 225);
+                doc.setLineWidth(0.75);
+                doc.line(margin, 574, pageWidth - margin, 574);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(120, 135, 155);
+                doc.text('Word Quest — English Department Carnival 2026', margin, 583);
+                doc.text(`Page ${data.pageNumber} of ${pageCount}`, pageWidth - margin, 583, { align: 'right' });
+            }
+        });
+
+        const fileName = `WordQuest_${currentTab.toUpperCase()}_PLAYERS_${new Date().toISOString().slice(0, 10)}.pdf`;
+        return { doc: doc, fileName: fileName, title: title };
     }
 
-    if (exportBtn) exportBtn.addEventListener('click', exportToCSV);
+    function closePdfPreview() {
+        if (pdfPreviewModal) pdfPreviewModal.classList.add('hidden');
+        if (pdfPreviewFrame) pdfPreviewFrame.src = 'about:blank';
+    }
+
+    function exportToPDF() {
+        const result = buildExportPDF();
+        if (!result) return;
+
+        pendingPdfDoc     = result.doc;
+        pendingPdfFileName = result.fileName;
+
+        if (pdfPreviewTitle) pdfPreviewTitle.textContent = result.title;
+        if (pdfPreviewSub)   pdfPreviewSub.textContent   = 'Preview below, then Download to save.';
+
+        if (pdfPreviewFrame && pendingPdfBlobUrl) {
+            URL.revokeObjectURL(pendingPdfBlobUrl);
+        }
+        pendingPdfBlobUrl = URL.createObjectURL(result.doc.output('blob'));
+        if (pdfPreviewFrame) pdfPreviewFrame.src = pendingPdfBlobUrl;
+        if (pdfPreviewModal) pdfPreviewModal.classList.remove('hidden');
+    }
+
+    function downloadPdf() {
+        if (pendingPdfDoc) pendingPdfDoc.save(pendingPdfFileName);
+    }
+
+    if (exportBtn)           exportBtn.addEventListener('click', exportToPDF);
+    if (pdfPreviewClose)     pdfPreviewClose.addEventListener('click', closePdfPreview);
+    if (pdfPreviewCancel)    pdfPreviewCancel.addEventListener('click', closePdfPreview);
+    if (pdfPreviewDownload)  pdfPreviewDownload.addEventListener('click', downloadPdf);
 
     // ----------------------------------------------------------------------
     // 8. Reset All Data Button (Erases Firestore & LocalStorage)

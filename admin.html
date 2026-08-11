@@ -59,9 +59,9 @@
                 </div>
 
                 <div class="header-actions-group">
-                    <button id="export-csv-btn" class="glass-btn btn-secondary btn-sm">
+                    <button id="export-pdf-btn" class="glass-btn btn-secondary btn-sm">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        <span>Export CSV</span>
+                        <span>Export PDF</span>
                     </button>
                     <button id="clear-data-btn" class="glass-btn btn-danger btn-sm">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -431,8 +431,36 @@
         </div>
     </div>
 
+    <!-- PDF Export Preview Modal -->
+    <div id="modal-pdf-preview" class="modal-overlay hidden">
+        <div class="modal-content glass-card pdf-preview-modal animate-scale-up">
+            <div class="spectate-header">
+                <div class="spectate-player-info">
+                    <span class="status-pill-live"><span class="live-pulse-dot"></span>PDF EXPORT PREVIEW</span>
+                    <h2 id="pdf-preview-title" class="spectate-player-title">Export Preview</h2>
+                    <div id="pdf-preview-sub" class="spectate-player-sub">Preview before saving</div>
+                </div>
+                <button type="button" id="close-pdf-preview" class="modal-close-btn" title="Close">&times;</button>
+            </div>
+
+            <div class="pdf-preview-body">
+                <iframe id="pdf-preview-frame" class="pdf-preview-frame" title="PDF Preview"></iframe>
+            </div>
+
+            <div class="pdf-preview-actions">
+                <button type="button" id="pdf-preview-download" class="glass-btn btn-primary">Download PDF</button>
+                <button type="button" id="pdf-preview-cancel" class="glass-btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase Service Integration -->
     <script type="module" src="firebase-service.js"></script>
+    <!-- PDF Generation Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- Inline Report Logos (base64) -->
+    <script src="admin-logos.js" defer></script>
     <!-- Admin Logic Script -->
     <script src="admin.js" defer></script>
 </body>
