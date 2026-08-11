@@ -59,20 +59,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
-    // 0.5. Leaderboard Full-Screen Preview (code-locked close)
+    // 0.5. Present Mode (Live Players / Leaderboard) with code-locked close
     // ----------------------------------------------------------------------
     const previewBtn        = document.getElementById('btn-preview-leaderboard');
     const previewModal      = document.getElementById('modal-leaderboard-preview');
     const previewCloseBtn   = document.getElementById('close-leaderboard-preview');
-    const previewBody       = document.getElementById('leaderboard-preview-body');
     const previewLockGate   = document.getElementById('preview-lock-gate');
     const previewLockInput  = document.getElementById('preview-lock-code-input');
     const previewLockSubmit = document.getElementById('preview-lock-submit');
     const previewLockError  = document.getElementById('preview-lock-error');
 
-    function openLeaderboardPreview() {
-        if (!previewBody) return;
-
+    function buildPresentLeaderboard() {
         // Build the same deduplicated + sorted ranking as the leaderboard tab
         const bestByPlayer = {};
         leaderboardList.forEach(record => {
@@ -91,9 +88,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return (b.score || 0) - (a.score || 0);
         });
 
-        previewBody.innerHTML = '';
+        let rows = '';
         if (ranked.length === 0) {
-            previewBody.innerHTML = `
+            rows = `
                 <tr>
                     <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">
                         No leaderboard scores recorded yet.
@@ -101,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>`;
         } else {
             ranked.forEach((item, idx) => {
-                const tr = document.createElement('tr');
                 const playerDoc = playersList.find(p => p.rollNumber && p.rollNumber === item.rollNumber) || {};
                 const lvlNum = item.currentLevel || playerDoc.currentLevel || 1;
                 const lvlTitle = item.levelTitle || playerDoc.levelTitle || 'Novice';
@@ -111,17 +107,107 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (idx === 1) rankHtml = medalSvg('silver', '2');
                 else if (idx === 2) rankHtml = medalSvg('bronze', '3');
 
-                tr.innerHTML = `
-                    <td><strong>${rankHtml}</strong></td>
-                    <td><strong class="gold-text">${escapeHtml(item.rollNumber || '—')}</strong></td>
-                    <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
-                    <td>${escapeHtml((item.department || '—').replace('Department of ', ''))}</td>
-                    <td><span class="diff-chip diff-medium">${escapeHtml(item.year || '—')}</span></td>
-                    <td>${getLevelBadgeHtml(lvlNum, lvlTitle)}</td>
-                    <td><span class="cum-score">${Math.max(item.cumulativeScore || 0, item.score || 0)}</span></td>
-                `;
-                previewBody.appendChild(tr);
+                rows += `
+                    <tr>
+                        <td><strong>${rankHtml}</strong></td>
+                        <td><strong class="gold-text">${escapeHtml(item.rollNumber || '—')}</strong></td>
+                        <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
+                        <td>${escapeHtml((item.department || '—').replace('Department of ', ''))}</td>
+                        <td><span class="diff-chip diff-medium">${escapeHtml(item.year || '—')}</span></td>
+                        <td>${getLevelBadgeHtml(lvlNum, lvlTitle)}</td>
+                        <td><span class="cum-score">${Math.max(item.cumulativeScore || 0, item.score || 0)}</span></td>
+                    </tr>`;
             });
+        }
+
+        return `
+            <table class="admin-table preview-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Roll No</th>
+                        <th>Player Name</th>
+                        <th>Department</th>
+                        <th>Year</th>
+                        <th>Level</th>
+                        <th>Total Score</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+    }
+
+    function buildPresentLive() {
+        const deduped = deduplicatePlayers(playersList);
+        const livePlayers = deduped.filter(item => isPlayerLiveInGame(item));
+
+        let rows = '';
+        if (livePlayers.length === 0) {
+            rows = `
+                <tr>
+                    <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">
+                        No active live players right now.
+                    </td>
+                </tr>`;
+        } else {
+            livePlayers.forEach((item, idx) => {
+                const lvlNum = item.currentLevel || 1;
+                const lvlTitle = item.levelTitle || 'Novice';
+
+                let rankHtml = `${idx + 1}`;
+                if (idx === 0) rankHtml = medalSvg('gold', '1');
+                else if (idx === 1) rankHtml = medalSvg('silver', '2');
+                else if (idx === 2) rankHtml = medalSvg('bronze', '3');
+
+                rows += `
+                    <tr>
+                        <td><strong>${rankHtml}</strong></td>
+                        <td><span class="status-pill-live"><span class="live-pulse-dot"></span>LIVE</span></td>
+                        <td><strong class="gold-text">${escapeHtml(item.rollNumber || '—')}</strong></td>
+                        <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
+                        <td>${escapeHtml((item.department || '—').replace('Department of ', ''))}</td>
+                        <td><span class="diff-chip diff-medium">${escapeHtml(item.year || '—')}</span></td>
+                        <td>${getLevelBadgeHtml(lvlNum, lvlTitle)}</td>
+                        <td><strong class="gold-text">${item.score || 0}</strong></td>
+                        <td><span class="cum-score">${item.cumulativeScore || item.score || 0}</span></td>
+                    </tr>`;
+            });
+        }
+
+        return `
+            <table class="admin-table preview-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Status</th>
+                        <th>Roll No</th>
+                        <th>Player Name</th>
+                        <th>Department</th>
+                        <th>Year</th>
+                        <th>Level</th>
+                        <th>Round Score</th>
+                        <th>Total Score</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+    }
+
+    function openPresent(mode) {
+        const container = document.getElementById('present-table-container');
+        if (!container) return;
+
+        const modeLabel = document.getElementById('present-mode-label');
+        const modeTitle = document.getElementById('present-mode-title');
+
+        if (mode === 'live') {
+            if (modeLabel) modeLabel.textContent = 'LIVE PLAYERS';
+            if (modeTitle) modeTitle.innerHTML = 'Word <span class="gold-text">Quest</span> — Live Players';
+            container.innerHTML = buildPresentLive();
+        } else {
+            if (modeLabel) modeLabel.textContent = 'LIVE LEADERBOARD';
+            if (modeTitle) modeTitle.innerHTML = 'Word <span class="gold-text">Quest</span> — Leaderboard';
+            container.innerHTML = buildPresentLeaderboard();
         }
 
         if (previewModal) previewModal.classList.remove('hidden');
@@ -148,7 +234,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (previewBtn) {
-        previewBtn.addEventListener('click', openLeaderboardPreview);
+        previewBtn.addEventListener('click', () => {
+            openPresent(currentTab === 'live' ? 'live' : 'leaderboard');
+        });
     }
     if (previewCloseBtn) {
         previewCloseBtn.addEventListener('click', () => {
@@ -270,8 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (viewLiveTable)        viewLiveTable.classList.toggle('hidden', tab !== 'live');
         if (viewLeaderboardTable) viewLeaderboardTable.classList.toggle('hidden', tab !== 'leaderboard');
 
-        // Preview button only appears on the Leaderboard tab
-        if (previewBtn) previewBtn.classList.toggle('hidden', tab !== 'leaderboard');
+        // Present button only appears on the Live Players & Leaderboard tabs
+        if (previewBtn) previewBtn.classList.toggle('hidden', tab !== 'live' && tab !== 'leaderboard');
 
         renderCurrentTab();
     }

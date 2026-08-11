@@ -400,35 +400,20 @@
         </div>
     </div>
 
-    <!-- Leaderboard Full-Screen Preview Modal -->
+    <!-- Present Mode Modal (Live Players / Leaderboard) -->
     <div id="modal-leaderboard-preview" class="modal-overlay hidden">
         <div class="glass-card leaderboard-preview-modal animate-scale-up">
             <div class="spectate-header">
                 <div class="spectate-player-info">
-                    <span class="status-pill-live"><span class="live-pulse-dot"></span>LIVE LEADERBOARD</span>
-                    <h2 class="spectate-player-title">Word <span class="gold-text">Quest</span> — Leaderboard</h2>
+                    <span class="status-pill-live"><span class="live-pulse-dot"></span><span id="present-mode-label">LIVE LEADERBOARD</span></span>
+                    <h2 class="spectate-player-title" id="present-mode-title">Word <span class="gold-text">Quest</span> — Leaderboard</h2>
                     <div class="spectate-player-sub">English Department Carnival 2026</div>
                 </div>
                 <button type="button" id="close-leaderboard-preview" class="modal-close-btn" title="Lock & Close">&times;</button>
             </div>
 
-            <div class="table-wrapper preview-table-wrapper">
-                <table class="admin-table preview-table">
-                    <thead>
-                        <tr>
-                            <th>Rank</th>
-                            <th>Roll No</th>
-                            <th>Player Name</th>
-                            <th>Department</th>
-                            <th>Year</th>
-                            <th>Level</th>
-                            <th>Total Score</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboard-preview-body">
-                        <!-- Populated dynamically via admin.js -->
-                    </tbody>
-                </table>
+            <div class="table-wrapper preview-table-wrapper" id="present-table-container">
+                <!-- Populated dynamically via admin.js -->
             </div>
         </div>
 
