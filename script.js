@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const playerNameInput  = document.getElementById('player-name');
     const playerPhoneInput = document.getElementById('player-phone');
     const rollNumberInput  = document.getElementById('roll-number');
+    const fieldRoll        = document.getElementById('field-roll');
     const departmentSelect = document.getElementById('department');
     const yearSelect       = document.getElementById('year-of-study');
     const nameError        = document.getElementById('name-error');
@@ -34,6 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Returning player form
     const returningForm    = document.getElementById('returning-form');
     const retRollInput     = document.getElementById('ret-roll');
+    const retFieldRoll     = document.getElementById('field-ret-roll');
+    const retPhoneInput    = document.getElementById('ret-phone');
+    const retFieldPhone    = document.getElementById('field-ret-phone');
+    const retPhoneError    = document.getElementById('ret-phone-error');
     const retDeptSelect    = document.getElementById('ret-department');
     const retYearSelect    = document.getElementById('ret-year');
     const retRollError     = document.getElementById('ret-roll-error');
@@ -302,6 +307,41 @@ document.addEventListener('DOMContentLoaded', () => {
     attachClearError(retRollInput, retRollError);
     attachClearError(retDeptSelect, retDeptError);
     attachClearError(retYearSelect, retYearError);
+    if (retPhoneInput) attachClearError(retPhoneInput, retPhoneError);
+
+    // First-year students have no roll number — toggle the field visibility.
+    const FIRST_YEAR_VALUES = ['1st Year', '1st Year PG'];
+    function isFirstYear(year) { return FIRST_YEAR_VALUES.indexOf(year) !== -1; }
+
+    function toggleRollFieldVisibility() {
+        // New registration form
+        if (fieldRoll) {
+            const hidden = isFirstYear(yearSelect ? yearSelect.value : '');
+            if (hidden) {
+                fieldRoll.classList.add('hidden');
+                if (rollNumberInput) { rollNumberInput.value = ''; rollNumberInput.classList.remove('input-error'); }
+                if (rollError) { rollError.textContent = ''; rollError.classList.remove('visible'); }
+            } else {
+                fieldRoll.classList.remove('hidden');
+            }
+        }
+        // Returning form
+        if (retFieldRoll && retFieldPhone) {
+            const hidden = isFirstYear(retYearSelect ? retYearSelect.value : '');
+            retFieldRoll.classList.toggle('hidden', hidden);
+            retFieldPhone.classList.toggle('hidden', !hidden);
+            if (hidden && retRollInput) { retRollInput.value = ''; retRollInput.classList.remove('input-error'); }
+            if (hidden && retRollError) { retRollError.textContent = ''; retRollError.classList.remove('visible'); }
+            if (!hidden && retPhoneInput) { retPhoneInput.value = ''; retPhoneInput.classList.remove('input-error'); }
+            if (!hidden && retPhoneError) { retPhoneError.textContent = ''; retPhoneError.classList.remove('visible'); }
+        }
+    }
+
+    if (yearSelect)       yearSelect.addEventListener('change', toggleRollFieldVisibility);
+    if (retYearSelect)    retYearSelect.addEventListener('change', toggleRollFieldVisibility);
+
+    // Initialize field visibility based on any restored year
+    toggleRollFieldVisibility();
 
     function showErr(input, errorEl, msg) {
         if (input)    input.classList.add('input-error');
@@ -422,9 +462,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = pendingRegData || {};
         const name  = data.name  || (playerNameInput  ? playerNameInput.value  : '').trim();
         const phone = data.phone || (playerPhoneInput ? playerPhoneInput.value : '').trim();
-        const roll  = data.roll  || (rollNumberInput  ? rollNumberInput.value  : '').trim().toUpperCase();
+        let roll    = data.roll  || (rollNumberInput  ? rollNumberInput.value  : '').trim().toUpperCase();
         const dept  = data.dept  || (departmentSelect ? departmentSelect.value : '');
         const year  = data.year  || (yearSelect       ? yearSelect.value       : '');
+        if (!roll && isFirstYear(year)) roll = '1ST-' + phone;
 
         saveToStorage(name, roll, dept, year, phone);
 
@@ -498,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showErr(playerPhoneInput, phoneError, 'Please enter a valid 10-digit phone number.');
                 hasError = true;
             }
-            if (!roll) {
+            if (!roll && !isFirstYear(year)) {
                 showErr(rollNumberInput, rollError, 'Please select your roll number.');
                 hasError = true;
             }
@@ -512,6 +553,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (hasError) { triggerShake(); return; }
+
+            if (!roll && isFirstYear(year)) roll = '1ST-' + phone;
 
             const regData = { name, phone, roll, dept, year };
             const rulesKey = KEY_RULES_ACCEPTED_PREFIX + roll + '|' + dept + '|' + year;
@@ -540,13 +583,19 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
 
             const roll = (retRollInput   ? retRollInput.value   : '').trim().toUpperCase();
+            const phone = (retPhoneInput ? retPhoneInput.value : '').trim();
             const dept = retDeptSelect   ? retDeptSelect.value  : '';
             const year = retYearSelect   ? retYearSelect.value  : '';
+            const usePhone = isFirstYear(year);
 
             let hasError = false;
 
-            if (!roll) {
+            if (!usePhone && !roll) {
                 showErr(retRollInput, retRollError, 'Please select your roll number.');
+                hasError = true;
+            }
+            if (usePhone && (!phone || !/^[0-9]{10}$/.test(phone))) {
+                showErr(retPhoneInput, retPhoneError, 'Please enter a valid 10-digit phone number.');
                 hasError = true;
             }
             if (!dept) {
@@ -559,6 +608,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (hasError) { triggerShake(); return; }
+
+            const lookupRoll = usePhone ? ('1ST-' + phone) : roll;
 
             // Show searching state
             if (retStartBtn) {
@@ -573,14 +624,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Firebase unavailable — proceed with whatever is in localStorage
                     saveToStorage(
                         localStorage.getItem(KEY_NAME) || 'Player',
-                        roll, dept, year
+                        lookupRoll, dept, year
                     );
                     launchGame(retStartBtn);
                     return;
                 }
 
                 try {
-                    const player = await fb.getPlayerByRollNumber(roll, dept, year);
+                    const player = await fb.getPlayerByRollNumber(lookupRoll, dept, year);
 
                     if (!player) {
                         // Not found
@@ -598,14 +649,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     // Found — restore profile and go
-                    saveToStorage(player.name || 'Player', roll, dept, year);
+                    saveToStorage(player.name || 'Player', lookupRoll, dept, year);
                     if (player.id) localStorage.setItem(KEY_PLAYER_ID, player.id);
                     launchGame(retStartBtn);
 
                 } catch (err) {
                     console.warn('Lookup error:', err);
                     // Network error fallback — still let them in
-                    saveToStorage(localStorage.getItem(KEY_NAME) || 'Player', roll, dept, year);
+                    saveToStorage(localStorage.getItem(KEY_NAME) || 'Player', lookupRoll, dept, year);
                     launchGame(retStartBtn);
                 }
             });

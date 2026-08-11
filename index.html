@@ -124,6 +124,29 @@
                         <div id="phone-error" class="error-message" aria-live="polite"></div>
                     </div>
 
+                    <!-- Year of Study Selection Field -->
+                    <div class="form-group">
+                        <label for="year-of-study" class="form-label">Year of Study</label>
+                        <div class="select-wrapper">
+                            <select id="year-of-study" class="glass-input glass-select" required>
+                                <option value="" disabled selected>Select your year of study...</option>
+                                <option value="1st Year">1st Year</option>
+                                <option value="2nd Year">2nd Year</option>
+                                <option value="3rd Year">3rd Year</option>
+                                <option value="1st Year PG">1st Year (PG)</option>
+                                <option value="2nd Year PG">2nd Year (PG)</option>
+                            </select>
+                            <div class="select-arrow">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div id="year-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
                     <!-- Roll Number Field -->
                     <div class="form-group" id="field-roll">
                         <label for="roll-number" class="form-label">Roll Number</label>
@@ -270,29 +293,6 @@
                         <div id="department-error" class="error-message" aria-live="polite"></div>
                     </div>
 
-                    <!-- Year of Study Selection Field -->
-                    <div class="form-group">
-                        <label for="year-of-study" class="form-label">Year of Study</label>
-                        <div class="select-wrapper">
-                            <select id="year-of-study" class="glass-input glass-select" required>
-                                <option value="" disabled selected>Select your year of study...</option>
-                                <option value="1st Year">1st Year</option>
-                                <option value="2nd Year">2nd Year</option>
-                                <option value="3rd Year">3rd Year</option>
-                                <option value="1st Year PG">1st Year (PG)</option>
-                                <option value="2nd Year PG">2nd Year (PG)</option>
-                            </select>
-                            <div class="select-arrow">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <polyline points="6 9 12 15 18 9" />
-                                </svg>
-                            </div>
-                        </div>
-                        <div id="year-error" class="error-message" aria-live="polite"></div>
-                    </div>
-
                     <!-- Submit Button -->
                     <button type="submit" id="start-btn" class="glass-btn btn-primary">
                         <span class="btn-text">Begin Quest</span>
@@ -318,7 +318,7 @@
                 <!-- ── ALREADY REGISTERED FORM (hidden by default) ── -->
                 <form id="returning-form" class="player-form returning-form hidden" novalidate>
                     <!-- Roll Number Lookup -->
-                    <div class="form-group">
+                    <div class="form-group" id="field-ret-roll">
                         <label for="ret-roll" class="form-label">Roll Number</label>
                         <div class="select-wrapper">
                             <select id="ret-roll" class="glass-input glass-select" required>
@@ -433,6 +433,17 @@
                             </div>
                         </div>
                         <div id="ret-roll-error" class="error-message" aria-live="polite"></div>
+                    </div>
+
+                    <!-- Phone Number Lookup (used for 1st-year players who have no roll number) -->
+                    <div class="form-group hidden" id="field-ret-phone">
+                        <label for="ret-phone" class="form-label">Phone Number</label>
+                        <div class="input-wrapper">
+                            <input type="tel" id="ret-phone" class="glass-input" placeholder="Enter 10-digit mobile number..."
+                                maxlength="10" autocomplete="off" pattern="[0-9]{10}">
+                            <span class="input-focus-border"></span>
+                        </div>
+                        <div id="ret-phone-error" class="error-message" aria-live="polite"></div>
                     </div>
 
                     <!-- Department (for lookup) -->
