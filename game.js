@@ -243,6 +243,9 @@ class WordSearch {
 
         /* live sync heartbeat */
         this._heartbeat = null;
+
+        /* play-history session guard (records each round only once) */
+        this._sessionRecorded = false;
     }
 
     /* ── PROGRESSIVE DIFFICULTY LEVELLING ───── */
@@ -342,6 +345,8 @@ class WordSearch {
         // Rehydrate cumulative score / level from Firestore (source of truth across devices)
         await this._restoreProgressFromFirestore();
 
+        this._sessionRecorded = false;
+
         this._loadUsedWords();
         this._loadPlayerLevel();
         this._applyDifficulty();
@@ -382,6 +387,8 @@ class WordSearch {
         this.foundDefinitions = {};
         this.hideDefinitionBanner();
         document.getElementById('end-definitions-summary')?.classList.add('hidden');
+
+        this._sessionRecorded = false;
 
         this._loadUsedWords();
         this._loadPlayerLevel();
@@ -450,6 +457,52 @@ class WordSearch {
         }
     }
 
+    /* ── PLAY HISTORY SESSION RECORDING ───────────
+       Every round (win / timeout / abandoned) uploads a lightweight session
+       record that the admin panel aggregates to show each player's play
+       history: games played, total time spent, best round and last played.
+       Guarded so each round emits exactly one record (level ups, admin
+       messages, pagehide + beforeunload double-fires are all safe). */
+    _recordSession(result, levelOverride) {
+        if (this._sessionRecorded) return;
+        this._sessionRecorded = true;
+
+        // Never record a session that never actually began (e.g. the player
+        // left during boot or while the admin's game-ended screen was showing).
+        if (!Array.isArray(this.grid) || this.grid.length === 0) return;
+
+        // Time actually spent this round = countdown consumed (excludes
+        // admin-message pause time since the timer halts while paused).
+        const timePlayedSecs = Math.min(this.gameSecs, Math.max(0, this.gameSecs - this._remaining));
+
+        const name       = localStorage.getItem('wordQuest_playerName')       || 'Player';
+        const rollNumber = localStorage.getItem('wordQuest_rollNumber')       || '';
+        const department = localStorage.getItem('wordQuest_department')        || '';
+        const year       = localStorage.getItem('wordQuest_yearOfStudy')       || '';
+        if (!rollNumber) return; // only players with a registered profile
+
+        const session = {
+            id: this._getPlayerKey(),
+            name,
+            rollNumber,
+            department,
+            year,
+            level: typeof levelOverride === 'number' ? levelOverride : this.level,
+            levelTitle: this.levelTitle,
+            score: this.score,
+            cumulativeScore: this.cumulativeScore,
+            wordsFound: this.foundWords.size,
+            totalWords: this.words.length,
+            timePlayedSecs,
+            result
+        };
+
+        if (window.WordQuestFirebase && window.WordQuestFirebase.recordPlaySession) {
+            window.WordQuestFirebase.recordPlaySession(session).catch(() => {});
+        }
+        console.log('Play session recorded:', result, rollNumber, timePlayedSecs + 's');
+    }
+
     // Keep live grid / active status fresh so admins see the player as LIVE even while idle
     _startLiveHeartbeat() {
         this._stopLiveHeartbeat();
@@ -482,6 +535,7 @@ class WordSearch {
             window.WordQuestFirebase.subscribeToGameState((isActive) => {
                 if (!isActive) {
                     this._stopTimer();
+                    this._recordSession('ended');
                     this._unregisterActiveGame();
                     this._showGameEndedScreen();
                 }
@@ -1334,6 +1388,8 @@ class WordSearch {
 
         this._saveScore(); // commits cumulative: cumulativeScore += score (localStorage + Firestore)
 
+        this._recordSession('win', clearedLevel);
+
         const emojiEl = document.getElementById('end-emoji');
         if (emojiEl) emojiEl.textContent = '🏆';
         
@@ -1371,6 +1427,7 @@ class WordSearch {
         this._unregisterActiveGame();
         SFX.playGameOver();
         this._clearRoundScore(); // round not cleared — the earned points are NOT banked
+        this._recordSession('timeout');
 
         // 1. Reveal answers on grid immediately
         this._revealAnswers();
@@ -1721,5 +1778,11 @@ if (document.readyState === 'loading') {
 }
 
 // Clean up active game session if user navigates away mid-game
-window.addEventListener('pagehide', () => WS._unregisterActiveGame());
-window.addEventListener('beforeunload', () => WS._unregisterActiveGame());
+window.addEventListener('pagehide', () => {
+    WS._recordSession('left');
+    WS._unregisterActiveGame();
+});
+window.addEventListener('beforeunload', () => {
+    WS._recordSession('left');
+    WS._unregisterActiveGame();
+});

@@ -538,18 +538,27 @@ export async function deletePlayerFromFirestore(target) {
             }
         }
 
-        // 3. Query & delete any matching documents by rollNumber across all collections
-        if (rollNumber) {
-            for (const col of collections) {
-                try {
-                    const q = query(collection(db, col), where("rollNumber", "==", rollNumber));
-                    const snap = await getDocs(q);
-                    const deletes = [];
-                    snap.forEach(d => deletes.push(deleteDoc(d.ref)));
-                    await Promise.all(deletes);
-                } catch (e) {}
+// 3. Query & delete any matching documents by rollNumber across all collections
+            if (rollNumber) {
+                for (const col of collections) {
+                    try {
+                        const q = query(collection(db, col), where("rollNumber", "==", rollNumber));
+                        const snap = await getDocs(q);
+                        const deletes = [];
+                        snap.forEach(d => deletes.push(deleteDoc(d.ref)));
+                        await Promise.all(deletes);
+                    } catch (e) {}
+                }
             }
-        }
+
+            // 4. Delete any recorded play sessions for this player
+            if (rollNumber) {
+                try {
+                    await deletePlaySessionsForPlayer(rollNumber);
+                } catch (e) {
+                    console.warn("Firestore delete playSessions error:", e);
+                }
+            }
 
         console.log("Player completely deleted across Firestore collections for:", docId || rollNumber);
         return true;
@@ -564,7 +573,7 @@ export async function deletePlayerFromFirestore(target) {
  */
 export async function clearAllDataFromFirestore() {
     try {
-        const collectionsToClear = ["players", "leaderboard", "cumulativeScores"];
+        const collectionsToClear = ["players", "leaderboard", "cumulativeScores", "playSessions"];
         for (const colName of collectionsToClear) {
             const snap = await getDocs(collection(db, colName));
             const promises = snap.docs.map(d => deleteDoc(d.ref));
@@ -699,6 +708,87 @@ export function subscribeToPlayerMessages(playerId, callback) {
 }
 
 /**
+ * Record a completed/abandoned play session to the `playSessions` collection.
+ * The admin panel aggregates this per player to show play history
+ * (games played, total time spent, best round, last played).
+ * @param {Object} session { name, rollNumber, department, year, level, levelTitle, score, cumulativeScore, wordsFound, totalWords, timePlayedSecs, result }
+ * result: 'win' | 'timeout' | 'ended' | 'left'
+ */
+export async function recordPlaySession(session = {}) {
+    const { rollNumber, department, year } = session;
+    if (!rollNumber && !session.id) return null;
+    try {
+        const docRef = await addDoc(collection(db, "playSessions"), {
+            name:           session.name           || "Player",
+            rollNumber:     rollNumber            || "",
+            department:     department            || "",
+            year:           year                  || "",
+            level:          Number(session.level) || 1,
+            levelTitle:     session.levelTitle    || "Novice",
+            score:          Number(session.score) || 0,
+            cumulativeScore:Number(session.cumulativeScore) || 0,
+            wordsFound:     Number(session.wordsFound)     || 0,
+            totalWords:     Number(session.totalWords)     || 0,
+            timePlayedSecs: Math.max(0, Number(session.timePlayedSecs) || 0),
+            result:         session.result        || 'left',
+            endedAt:        serverTimestamp(),
+            date:           new Date().toLocaleDateString()
+        });
+        console.log("Play session recorded:", docRef.id, rollNumber, session.result);
+        return docRef.id;
+    } catch (e) {
+        console.warn("Firestore recordPlaySession error:", e);
+        return null;
+    }
+}
+
+/**
+ * Subscribe to Live Play Session records (for the admin play-history modal).
+ * @param {Function} callback Called with list of session objects
+ */
+export function subscribeToPlaySessions(callback) {
+    try {
+        const q = query(collection(db, "playSessions"), orderBy("endedAt", "desc"), limit(1500));
+        return onSnapshot(q, (snapshot) => {
+            const list = [];
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                list.push({
+                    id: docSnap.id,
+                    timePlayedSecs: Number(data.timePlayedSecs) || 0,
+                    endedAt: data.endedAt,
+                    ...data
+                });
+            });
+            callback(list);
+        }, (error) => {
+            console.warn("Firestore playSessions snapshot error:", error);
+        });
+    } catch (e) {
+        console.warn("Firestore subscribeToPlaySessions error:", e);
+    }
+}
+
+/**
+ * Delete all play session records for a player (used when a registration is deleted).
+ * @param {string} rollNumber
+ */
+export async function deletePlaySessionsForPlayer(rollNumber) {
+    if (!rollNumber) return 0;
+    try {
+        const q = query(collection(db, "playSessions"), where("rollNumber", "==", rollNumber));
+        const snap = await getDocs(q);
+        const deletes = [];
+        snap.forEach(d => deletes.push(deleteDoc(d.ref)));
+        await Promise.allSettled(deletes);
+        return deletes.length;
+    } catch (e) {
+        console.warn("Firestore deletePlaySessionsForPlayer error:", e);
+        return 0;
+    }
+}
+
+/**
  * Acknowledge and clear the admin message for a player so a future
  * message is detected fresh (overwrite semantics).
  * @param {string} playerId Firestore player doc id
@@ -742,6 +832,9 @@ window.WordQuestFirebase = {
     broadcastMessageToLivePlayers,
     subscribeToPlayerMessages,
     acknowledgePlayerMessage,
+    recordPlaySession,
+    subscribeToPlaySessions,
+    deletePlaySessionsForPlayer,
     clearAllDataFromFirestore
 };
 

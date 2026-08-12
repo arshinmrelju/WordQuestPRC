@@ -400,6 +400,67 @@
         </div>
     </div>
 
+    <!-- Player Play History Modal -->
+    <div id="modal-player-history" class="modal-overlay hidden">
+        <div class="modal-content glass-card player-history-modal animate-scale-up">
+            <div class="spectate-header">
+                <div class="spectate-player-info">
+                    <span class="status-pill-live"><span class="live-pulse-dot"></span>PLAY HISTORY</span>
+                    <h2 id="history-player-name" class="spectate-player-title">Player Name</h2>
+                    <div id="history-player-sub" class="spectate-player-sub">Roll: — • Dept: — • Year: —</div>
+                </div>
+                <button type="button" id="close-history-modal" class="modal-close-btn" title="Close Play History">&times;</button>
+            </div>
+
+            <!-- History Summary Strip -->
+            <div class="history-summary-grid" id="history-summary-grid">
+                <div class="history-summary-item">
+                    <span class="history-summary-label">Games Played</span>
+                    <span id="history-games-val" class="history-summary-val">0</span>
+                </div>
+                <div class="history-summary-item">
+                    <span class="history-summary-label">Total Time Played</span>
+                    <span id="history-time-val" class="history-summary-val gold-text">0s</span>
+                </div>
+                <div class="history-summary-item">
+                    <span class="history-summary-label">Best Round</span>
+                    <span id="history-best-val" class="history-summary-val gold-text">0</span>
+                </div>
+                <div class="history-summary-item">
+                    <span class="history-summary-label">Total Score</span>
+                    <span id="history-total-val" class="history-summary-val cum-score">0</span>
+                </div>
+                <div class="history-summary-item">
+                    <span class="history-summary-label">Current Level</span>
+                    <span id="history-level-val" class="history-summary-val">Lvl 1</span>
+                </div>
+                <div class="history-summary-item">
+                    <span class="history-summary-label">Last Played</span>
+                    <span id="history-last-val" class="history-summary-val">—</span>
+                </div>
+            </div>
+
+            <div class="table-wrapper history-table-wrapper">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Level</th>
+                            <th>Result</th>
+                            <th>Words Found</th>
+                            <th>Round Score</th>
+                            <th>Time Played</th>
+                            <th>When</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body">
+                        <!-- Populated dynamically via admin.js -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Present Mode Modal (Live Players / Leaderboard) -->
     <div id="modal-leaderboard-preview" class="modal-overlay hidden">
         <div class="glass-card leaderboard-preview-modal animate-scale-up">

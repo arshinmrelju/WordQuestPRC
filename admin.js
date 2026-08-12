@@ -341,6 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Data State
     let playersList     = []; // Registered players from Firestore 'players'
     let leaderboardList = []; // Game scores from Firestore 'leaderboard'
+    let playSessionsList = []; // Completed/abandoned rounds from Firestore 'playSessions'
     let customWordsList = [];
     let currentTab      = 'players'; // 'players' | 'live' | 'leaderboard'
     let firebaseReady   = false;    // true once Firestore has responded at least once
@@ -552,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             tr.innerHTML = `
                 <td><strong class="gold-text">${escapeHtml(rollDisplay)}</strong></td>
-                <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
+                <td><a class="player-name-link" data-id="${item.id}" title="View play history" style="font-weight: 600; color: var(--text-primary); text-decoration: none;">${escapeHtml(item.name || 'Anonymous')}</a></td>
                 <td>${statusHtml}</td>
                 <td>${levelHtml}</td>
                 <td style="font-weight: 700; color: var(--accent-gold-light);">${totalScore}</td>
@@ -567,6 +568,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 </td>
             `;
             playersTableBody.appendChild(tr);
+        });
+
+        // Event Handlers for viewing a player's play history (click the name)
+        playersTableBody.querySelectorAll('.player-name-link').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = el.getAttribute('data-id');
+                const player = deduped.find(p => p.id === id);
+                if (player) openPlayerHistoryModal(player);
+            });
         });
 
         // Event Handlers for delete player
@@ -587,6 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (deleted !== false) {
                     playersList = playersList.filter(p => p.id !== id && p.rollNumber !== roll);
                     leaderboardList = leaderboardList.filter(r => r.id !== id && r.rollNumber !== roll);
+                    playSessionsList = playSessionsList.filter(s => s.rollNumber !== roll);
                     saveLeaderboard();
                 }
                 updateStats();
@@ -965,6 +977,135 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------------
+    // 4.8. Player Play History Modal (per-player session log)
+    // ----------------------------------------------------------------------
+    const historyModal        = document.getElementById('modal-player-history');
+    const closeHistoryBtn     = document.getElementById('close-history-modal');
+    const historyNameEl       = document.getElementById('history-player-name');
+    const historySubEl        = document.getElementById('history-player-sub');
+    const historyTableBody    = document.getElementById('history-table-body');
+    const historySummaryEls   = {
+        games: document.getElementById('history-games-val'),
+        time:  document.getElementById('history-time-val'),
+        best:  document.getElementById('history-best-val'),
+        total: document.getElementById('history-total-val'),
+        level: document.getElementById('history-level-val'),
+        last:  document.getElementById('history-last-val')
+    };
+
+    function formatDuration(secs) {
+        secs = Math.max(0, Math.round(Number(secs) || 0));
+        if (secs < 60) return `${secs}s`;
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        if (m < 60) return s ? `${m}m ${s}s` : `${m}m`;
+        const h = Math.floor(m / 60);
+        const rm = m % 60;
+        return `${h}h ${String(rm).padStart(2, '0')}m`;
+    }
+
+    function tsToStamp(ts) {
+        const ms = tsToMillis(ts);
+        return ms ? new Date(ms) : null;
+    }
+
+    function getSessionResultHtml(result) {
+        switch (result) {
+            case 'win':     return '<span class="history-result-pill result-win">Cleared</span>';
+            case 'timeout': return '<span class="history-result-pill result-fail">Failed</span>';
+            case 'ended':   return '<span class="history-result-pill result-ended">Ended by Admin</span>';
+            default:        return '<span class="history-result-pill result-left">Left mid-game</span>';
+        }
+    }
+
+    function playerSessionKey(player) {
+        return `${player.rollNumber || ''}|${player.department || ''}|${player.year || ''}`;
+    }
+
+    function openPlayerHistoryModal(player) {
+        if (!player) return;
+
+        if (historyNameEl) historyNameEl.textContent = player.name || 'Anonymous Player';
+        if (historySubEl)  historySubEl.textContent  = `Roll: ${player.rollNumber || '—'} • Dept: ${(player.department || '—').replace('Department of ', '')} • Year: ${player.year || '—'}`;
+
+        const key = playerSessionKey(player);
+        const sessions = playSessionsList
+            .filter(s => playerSessionKey(s) === key)
+            .slice()
+            .sort((a, b) => tsToMillis(b.endedAt) - tsToMillis(a.endedAt));
+
+        // ── Summary strip ──────────────────────────────
+        const totalTimeSecs = sessions.reduce((acc, s) => acc + (Number(s.timePlayedSecs) || 0), 0);
+        const bestRound = sessions.reduce((mx, s) => Math.max(mx, Number(s.score) || 0), 0);
+        let lastPlayedStamp = null;
+        sessions.forEach(s => {
+            const t = tsToMillis(s.endedAt);
+            if (t && (!lastPlayedStamp || t > lastPlayedStamp)) lastPlayedStamp = t;
+        });
+
+        const levelNum = Number(player.currentLevel) || 1;
+        const levelTitle = player.levelTitle || 'Novice';
+
+        if (historySummaryEls.games) historySummaryEls.games.textContent = sessions.length;
+        if (historySummaryEls.time)  historySummaryEls.time.textContent  = sessions.length ? formatDuration(totalTimeSecs) : '—';
+        if (historySummaryEls.best)  historySummaryEls.best.textContent  = sessions.length ? bestRound : '—';
+        if (historySummaryEls.total) historySummaryEls.total.textContent = Math.max(Number(player.cumulativeScore) || 0, Number(player.score) || 0);
+        if (historySummaryEls.level) historySummaryEls.level.textContent = `Lvl ${levelNum} (${escapeHtml(levelTitle)})`;
+
+        let lastPlayedText = '—';
+        if (lastPlayedStamp) {
+            lastPlayedText = new Date(lastPlayedStamp).toLocaleString();
+        } else {
+            const fallback = tsToMillis(player.lastActiveAt) || tsToMillis(player.gameStartedAt) || tsToMillis(player.registeredAt);
+            if (fallback) lastPlayedText = new Date(fallback).toLocaleString();
+        }
+        if (historySummaryEls.last) historySummaryEls.last.textContent = lastPlayedText;
+
+        // ── Session table ──────────────────────────────
+        if (historyTableBody) historyTableBody.innerHTML = '';
+
+        if (sessions.length === 0) {
+            if (historyTableBody) {
+                historyTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                            No recorded play sessions yet.
+                        </td>
+                    </tr>`;
+            }
+        } else {
+            sessions.forEach((s, i) => {
+                const tr = document.createElement('tr');
+                const when = tsToStamp(s.endedAt);
+                tr.innerHTML = `
+                    <td><strong class="gold-text">#${i + 1}</strong></td>
+                    <td>${getLevelBadgeHtml(Number(s.level) || 1, s.levelTitle || 'Novice')}</td>
+                    <td>${getSessionResultHtml(s.result)}</td>
+                    <td>${(s.wordsFound || 0)} / ${(s.totalWords || 0)}</td>
+                    <td><strong class="gold-text">${Number(s.score) || 0}</strong></td>
+                    <td>${formatDuration(s.timePlayedSecs)}</td>
+                    <td>${when ? when.toLocaleString() : '—'}</td>
+                `;
+                historyTableBody.appendChild(tr);
+            });
+        }
+
+        if (historyModal) historyModal.classList.remove('hidden');
+    }
+
+    function closePlayerHistoryModal() {
+        if (historyModal) historyModal.classList.add('hidden');
+        if (historyTableBody) historyTableBody.innerHTML = '';
+    }
+
+    if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', closePlayerHistoryModal);
+    if (historyModal) {
+        historyModal.addEventListener('click', (e) => {
+            if (e.target === historyModal) closePlayerHistoryModal();
+        });
+    }
+
+    // ----------------------------------------------------------------------
     // 5. Render Leaderboard Data Table
     // ----------------------------------------------------------------------
     function renderLeaderboardTable() {
@@ -1085,6 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (deleted !== false) {
                     leaderboardList = leaderboardList.filter(r => r.id !== id && r.rollNumber !== roll);
                     playersList = playersList.filter(p => p.id !== id && p.rollNumber !== roll);
+                    playSessionsList = playSessionsList.filter(s => s.rollNumber !== roll);
                     saveLeaderboard();
                 }
                 updateStats();
@@ -1403,6 +1545,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             playersList = [];
             leaderboardList = [];
+            playSessionsList = [];
             leaderboardCache = [];
             localStorage.removeItem(STORAGE_KEY_LEADERBOARD);
 
@@ -1480,6 +1623,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     firebaseReady = true;
                     updateStats();
                     renderLeaderboardTable();
+                }
+            });
+        }
+
+        // 2.5. Subscribe to Live Play Session Records (per-player play history)
+        if (window.WordQuestFirebase.subscribeToPlaySessions) {
+            window.WordQuestFirebase.subscribeToPlaySessions((list) => {
+                if (Array.isArray(list)) {
+                    playSessionsList = list;
                 }
             });
         }
