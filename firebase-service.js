@@ -669,6 +669,9 @@ export async function clearAllDataFromFirestore() {
  */
 export async function setGameStateInFirestore(isActive) {
     try {
+        localStorage.setItem('wordQuest_isGameActive', JSON.stringify(isActive));
+    } catch (e) {}
+    try {
         await setDoc(doc(db, "system_config", "game_control"), {
             isGameActive: isActive,
             updatedAt: serverTimestamp()
@@ -688,11 +691,18 @@ export async function getGameStateFromFirestore() {
     try {
         const docSnap = await getDoc(doc(db, "system_config", "game_control"));
         if (docSnap.exists() && typeof docSnap.data().isGameActive === 'boolean') {
-            return docSnap.data().isGameActive;
+            const isActive = docSnap.data().isGameActive;
+            try { localStorage.setItem('wordQuest_isGameActive', JSON.stringify(isActive)); } catch(e){}
+            return isActive;
         }
     } catch (e) {
         console.warn("Firestore getGameState error:", e);
     }
+    // Check localStorage fallback
+    try {
+        const localVal = localStorage.getItem('wordQuest_isGameActive');
+        if (localVal !== null) return JSON.parse(localVal);
+    } catch (e) {}
     return true; // Default active if document not present
 }
 
@@ -701,19 +711,43 @@ export async function getGameStateFromFirestore() {
  * @param {Function} callback Called with boolean (isActive)
  */
 export function subscribeToGameState(callback) {
+    // Only pre-fire from localStorage when game is CLOSED (false).
+    // We intentionally do NOT pre-fire 'true' from cache — we let the
+    // authoritative Firestore snapshot confirm the active state to avoid
+    // a race where a stale 'true' in cache wipes out the closed-state UI
+    // before the real snapshot arrives.
+    try {
+        const localVal = localStorage.getItem('wordQuest_isGameActive');
+        if (localVal !== null && JSON.parse(localVal) === false) {
+            callback(false);
+        }
+    } catch (e) {}
+
     try {
         return onSnapshot(doc(db, "system_config", "game_control"), (docSnap) => {
             if (docSnap.exists() && typeof docSnap.data().isGameActive === 'boolean') {
-                callback(docSnap.data().isGameActive);
+                const isActive = docSnap.data().isGameActive;
+                try { localStorage.setItem('wordQuest_isGameActive', JSON.stringify(isActive)); } catch(e){}
+                callback(isActive);
             } else {
-                callback(true); // Default active
+                // Document doesn't exist yet — assume active
+                callback(true);
             }
         }, (error) => {
             console.warn("Game state snapshot error:", error);
+            // On listener error fall back to localStorage then default to active
+            try {
+                const localVal = localStorage.getItem('wordQuest_isGameActive');
+                if (localVal !== null) { callback(JSON.parse(localVal)); return; }
+            } catch (e) {}
             callback(true);
         });
     } catch (e) {
         console.warn("subscribeToGameState error:", e);
+        try {
+            const localVal = localStorage.getItem('wordQuest_isGameActive');
+            if (localVal !== null) { callback(JSON.parse(localVal)); return; }
+        } catch (e) {}
         callback(true);
     }
 }

@@ -411,14 +411,30 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         function runAccessGate() {
+            // Check local fallback first
+            try {
+                const localState = localStorage.getItem('wordQuest_isGameActive');
+                if (localState !== null && JSON.parse(localState) === false) {
+                    blockLaunch();
+                    return;
+                }
+            } catch (e) {}
+
             if (window.WordQuestFirebase && window.WordQuestFirebase.getGameStateFromFirestore) {
                 window.WordQuestFirebase.getGameStateFromFirestore().then((isActive) => {
                     if (!isActive) { blockLaunch(); } else { doNavigate(); }
                 }).catch(() => {
-                    doNavigate(); // offline fallback — let them through
+                    try {
+                        const localState = localStorage.getItem('wordQuest_isGameActive');
+                        if (localState !== null && JSON.parse(localState) === false) {
+                            blockLaunch();
+                            return;
+                        }
+                    } catch (e) {}
+                    doNavigate();
                 });
             } else {
-                doNavigate(); // Firebase not loaded yet — let them through
+                doNavigate();
             }
         }
 
@@ -459,35 +475,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showGameClosedBanner() {
-        let banner = document.getElementById('game-closed-banner');
-        if (!banner) {
-            banner = document.createElement('div');
-            banner.id = 'game-closed-banner';
-            banner.style.cssText = [
-                'position: fixed', 'top: 50%', 'left: 50%',
-                'transform: translate(-50%, -50%)',
-                'background: linear-gradient(135deg, rgba(217,119,6,0.96) 0%, rgba(146,64,14,0.96) 100%)',
-                'color: white', 'padding: 2rem 2.5rem', 'border-radius: 1.25rem',
-                'box-shadow: 0 25px 60px rgba(0,0,0,0.45)', 'z-index: 9999',
-                'text-align: center', 'max-width: 380px', 'width: 90%',
-                'backdrop-filter: blur(12px)', 'border: 1px solid rgba(255,255,255,0.22)',
-                'font-family: inherit', 'animation: fadeIn 0.3s ease'
-            ].join(';');
-            banner.innerHTML = `
-                <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🎉</div>
-                <h2 style="font-size: 1.35rem; font-weight: 800; margin: 0 0 0.5rem;">Word Quest Has Come to an End</h2>
-                <p style="font-size: 0.9rem; opacity: 0.9; margin: 0 0 1.25rem; line-height: 1.5;">
-                    The competition has officially come to an end.<br>Thank you for playing — check the final leaderboard to see how you placed!
-                </p>
-                <button onclick="document.getElementById('game-closed-banner').remove()"
-                    style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
-                    color: white; padding: 0.55rem 1.5rem; border-radius: 0.6rem;
-                    font-weight: 600; cursor: pointer; font-size: 0.9rem;">OK</button>
-            `;
-            document.body.appendChild(banner);
-        }
-        // Auto-dismiss after 6s
-        setTimeout(() => { if (banner) banner.remove(); }, 6000);
+        if (document.getElementById('game-closed-banner')) return; // Already shown
+        const backdrop = document.createElement('div');
+        backdrop.id = 'game-closed-backdrop';
+        backdrop.style.cssText = [
+            'position: fixed', 'inset: 0',
+            'background: rgba(0,0,0,0.55)',
+            'backdrop-filter: blur(4px)',
+            'z-index: 9998',
+            'animation: fadeIn 0.3s ease'
+        ].join(';');
+        document.body.appendChild(backdrop);
+
+        const banner = document.createElement('div');
+        banner.id = 'game-closed-banner';
+        banner.style.cssText = [
+            'position: fixed', 'top: 50%', 'left: 50%',
+            'transform: translate(-50%, -50%)',
+            'background: linear-gradient(135deg, rgba(217,119,6,0.98) 0%, rgba(146,64,14,0.98) 100%)',
+            'color: white', 'padding: 2.5rem 2.5rem', 'border-radius: 1.25rem',
+            'box-shadow: 0 25px 60px rgba(0,0,0,0.6)', 'z-index: 9999',
+            'text-align: center', 'max-width: 420px', 'width: 90%',
+            'border: 1px solid rgba(255,255,255,0.25)',
+            'font-family: inherit', 'animation: fadeIn 0.35s ease'
+        ].join(';');
+        banner.innerHTML = `
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🏆</div>
+            <h2 style="font-size: 1.45rem; font-weight: 800; margin: 0 0 0.65rem; letter-spacing: -0.01em;">Word Quest Has Ended</h2>
+            <p style="font-size: 0.92rem; opacity: 0.92; margin: 0 0 0.4rem; line-height: 1.6;">
+                The competition has officially concluded.
+            </p>
+            <p style="font-size: 0.85rem; opacity: 0.78; margin: 0 0 1.5rem; line-height: 1.5;">
+                Thank you for participating — check the leaderboard below to see your final ranking!
+            </p>
+            <button onclick="document.getElementById('game-closed-banner').remove(); document.getElementById('game-closed-backdrop')?.remove();"
+                style="background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.45);
+                color: white; padding: 0.6rem 2rem; border-radius: 0.65rem;
+                font-weight: 700; cursor: pointer; font-size: 0.95rem; transition: background 0.2s;"
+                onmouseover="this.style.background='rgba(255,255,255,0.35)'"
+                onmouseout="this.style.background='rgba(255,255,255,0.22)'">
+                View Leaderboard
+            </button>
+        `;
+        document.body.appendChild(banner);
     }
 
     // Hide/show the game entry (registration card + "Play Now" CTA) based on game state.
@@ -861,9 +891,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Hide the game entry (registration card + "Play Now" CTA) in real time while the game is closed
+    // Game entry (#player-card + .hero-cta) starts HIDDEN in the HTML.
+    // This function subscribes to Firestore and reveals them only when
+    // isGameActive === true. If Firebase never responds within 6s, we
+    // reveal by default to avoid permanently locking out players during outages.
     function subscribeRulesVisibility() {
-        const applyState = (isActive) => setGameEntryVisibility(isActive !== false);
+        let resolvedByFirestore = false;
+
+        const applyState = (isActive) => {
+            resolvedByFirestore = true;
+            const show = isActive !== false;
+            setGameEntryVisibility(show);
+            if (!show) {
+                showGameClosedBanner();
+            } else {
+                const banner = document.getElementById('game-closed-banner');
+                if (banner) banner.remove();
+            }
+        };
+
         const trySubscribe = (fb) => {
             if (fb && fb.subscribeToGameState) {
                 fb.subscribeToGameState(applyState);
@@ -871,11 +917,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return false;
         };
+
         if (!trySubscribe(window.WordQuestFirebase)) {
             waitForFirebase((fb) => {
-                if (!trySubscribe(fb)) setRulesCardVisibility(true);
+                if (!trySubscribe(fb)) {
+                    // Firebase didn't load at all — reveal the form as fallback
+                    setGameEntryVisibility(true);
+                }
             });
         }
+
+        // Safety net: if Firestore hasn't responded within 6s, reveal form
+        // (prevents permanent lockout during Firebase outages)
+        setTimeout(() => {
+            if (!resolvedByFirestore) {
+                console.warn('[WordQuest] Firestore game state not received in 6s — revealing entry form as fallback.');
+                setGameEntryVisibility(true);
+            }
+        }, 6000);
     }
 
     // Ensure player is marked inactive while on index.html (not in game.html)

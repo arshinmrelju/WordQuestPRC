@@ -105,6 +105,29 @@
     color: #ef4444;
 }
 
+/* Exit Game button */
+.exit-game-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 34px;
+    padding: 0 0.8rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+    transition: var(--transition-fast);
+}
+.exit-game-btn:hover {
+    background: rgba(239,68,68,0.12);
+    border-color: rgba(239,68,68,0.45);
+    color: #f87171;
+}
+.exit-game-btn svg {
+    flex-shrink: 0;
+}
+
 /* Logo in header */
 .game-header-logo {
     display: flex;

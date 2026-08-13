@@ -1740,24 +1740,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Load cached initial state immediately
+    try {
+        const cachedState = localStorage.getItem('wordQuest_isGameActive');
+        if (cachedState !== null) {
+            updateGameStatusUI(JSON.parse(cachedState));
+        }
+    } catch (e) {}
+
     if (startGameBtn) {
         startGameBtn.addEventListener('click', async () => {
+            try { localStorage.setItem('wordQuest_isGameActive', 'true'); } catch (e) {}
+            updateGameStatusUI(true);
             if (window.WordQuestFirebase && window.WordQuestFirebase.setGameStateInFirestore) {
                 await window.WordQuestFirebase.setGameStateInFirestore(true);
-                updateGameStatusUI(true);
-                alert('🟢 Game has been Started! Players can now join and play.');
             }
+            alert('🟢 Game has been Started! Players can now join and play.');
         });
     }
 
     if (endGameBtn) {
         endGameBtn.addEventListener('click', async () => {
             if (confirm('Are you sure you want to End the Game? This will close access to game.html for all players.')) {
+                try { localStorage.setItem('wordQuest_isGameActive', 'false'); } catch (e) {}
+                updateGameStatusUI(false);
                 if (window.WordQuestFirebase && window.WordQuestFirebase.setGameStateInFirestore) {
                     await window.WordQuestFirebase.setGameStateInFirestore(false);
-                    updateGameStatusUI(false);
-                    alert('🔴 Game has been Ended! Access to game.html is now closed.');
                 }
+                alert('🔴 Game has been Ended! Access to game.html is now closed.');
             }
         });
     }

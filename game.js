@@ -381,7 +381,28 @@ class WordSearch {
         this._loadWordBankFromFirebase();
     }
 
-    restart() {
+    async restart() {
+        // Verify game active status before starting a new round
+        let isActive = true;
+        try {
+            const stored = localStorage.getItem('wordQuest_isGameActive');
+            if (stored !== null && JSON.parse(stored) === false) isActive = false;
+        } catch (e) {}
+
+        if (isActive && window.WordQuestFirebase && window.WordQuestFirebase.getGameStateFromFirestore) {
+            try {
+                isActive = await window.WordQuestFirebase.getGameStateFromFirestore();
+            } catch (e) {}
+        }
+
+        if (!isActive) {
+            this._stopTimer();
+            this._recordSession('ended');
+            this._unregisterActiveGame();
+            this._showGameEndedScreen();
+            return;
+        }
+
         this._unregisterActiveGame();
         this._stopTimer();
         document.getElementById('overlay-end')?.classList.add('hidden');
@@ -670,7 +691,19 @@ class WordSearch {
         };
     }
 
+    exitGame() {
+        if (confirm('Are you sure you want to exit the game? Your current session progress will end.')) {
+            this._recordSession('left');
+            this._unregisterActiveGame();
+            this._stopTimer();
+            window.location.href = 'index.html';
+        }
+    }
+
     goToMainMenu() {
+        this._recordSession('left');
+        this._unregisterActiveGame();
+        this._stopTimer();
         window.location.href = 'index.html';
     }
 
