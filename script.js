@@ -71,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rulesCloseX      = document.getElementById('rules-close-x');
     const rulesAgreeError  = document.getElementById('rules-agree-error');
     let pendingRegData     = null;
+    let pendingRulesAction = null; // callback to run after rules are accepted
     let rulesAcceptedShown = false;
     let rulesScrolledFully = false;
 
@@ -247,11 +248,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initRulesCheckboxesSync();
     if (rulesCloseX) rulesCloseX.addEventListener('click', () => {
+        pendingRulesAction = null;
         hideRulesModal();
         if (startBtn) {
             startBtn.disabled = false;
             const t = startBtn.querySelector('.btn-text');
             if (t) t.textContent = 'Begin Quest';
+        }
+        if (retStartBtn) {
+            retStartBtn.disabled = false;
+            const t = retStartBtn.querySelector('.btn-text');
+            if (t) t.textContent = 'Find & Begin Quest';
         }
     });
     if (rulesConfirmBtn) {
@@ -278,7 +285,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 try { localStorage.setItem(key, String(Date.now())); } catch (e) {}
             }
             hideRulesModal();
-            proceedWithRegistration();
+            if (pendingRulesAction) {
+                const action = pendingRulesAction;
+                pendingRulesAction = null;
+                action();
+            } else {
+                proceedWithRegistration();
+            }
         });
     }
 
@@ -373,6 +386,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 7. Navigate to game (with game-active gate)
     // ------------------------------------------------------------------
     function launchGame(btn) {
+        const btnLabel = (btn && btn.querySelector('.btn-text')) ? btn.querySelector('.btn-text').textContent : 'Begin Quest';
+
         const doNavigate = () => {
             document.body.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
             document.body.style.opacity    = '0.7';
@@ -384,28 +399,60 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn) {
                 btn.disabled = false;
                 const t = btn.querySelector('.btn-text');
-                if (t) t.textContent = 'Begin Quest';
+                if (t) t.textContent = btnLabel;
             }
             document.body.style.opacity   = '';
             document.body.style.transform = '';
+            setGameEntryVisibility(false);
             showGameClosedBanner();
         };
+
+        function runAccessGate() {
+            if (window.WordQuestFirebase && window.WordQuestFirebase.getGameStateFromFirestore) {
+                window.WordQuestFirebase.getGameStateFromFirestore().then((isActive) => {
+                    if (!isActive) { blockLaunch(); } else { doNavigate(); }
+                }).catch(() => {
+                    doNavigate(); // offline fallback — let them through
+                });
+            } else {
+                doNavigate(); // Firebase not loaded yet — let them through
+            }
+        }
+
+        // Rules gate — every first-time player (new, returning, or welcome-back)
+        // must read & accept the Rules & Regulations before entering the game.
+        const rulesRoll = localStorage.getItem(KEY_ROLL) || '';
+        const rulesDept = localStorage.getItem(KEY_DEPARTMENT) || '';
+        const rulesYear = localStorage.getItem(KEY_YEAR) || '';
+        let rulesAccepted = true;
+        if (rulesRoll && rulesDept && rulesYear) {
+            try {
+                rulesAccepted = !!localStorage.getItem(KEY_RULES_ACCEPTED_PREFIX + rulesRoll + '|' + rulesDept + '|' + rulesYear);
+            } catch (e) {
+                rulesAccepted = true;
+            }
+        }
+
+        if (!rulesAccepted) {
+            if (btn) {
+                btn.disabled = true;
+                const t = btn.querySelector('.btn-text');
+                if (t) t.textContent = 'Review Rules...';
+            }
+            pendingRulesAction = runAccessGate;
+            showRulesModal({
+                name: localStorage.getItem(KEY_NAME) || 'Player',
+                roll: rulesRoll, dept: rulesDept, year: rulesYear
+            });
+            return;
+        }
 
         if (btn) {
             btn.disabled = true;
             const t = btn.querySelector('.btn-text');
             if (t) t.textContent = 'Checking access...';
         }
-
-        if (window.WordQuestFirebase && window.WordQuestFirebase.getGameStateFromFirestore) {
-            window.WordQuestFirebase.getGameStateFromFirestore().then((isActive) => {
-                if (!isActive) { blockLaunch(); } else { doNavigate(); }
-            }).catch(() => {
-                doNavigate(); // offline fallback — let them through
-            });
-        } else {
-            doNavigate(); // Firebase not loaded yet — let them through
-        }
+        runAccessGate();
     }
 
     function showGameClosedBanner() {
@@ -416,18 +463,18 @@ document.addEventListener('DOMContentLoaded', () => {
             banner.style.cssText = [
                 'position: fixed', 'top: 50%', 'left: 50%',
                 'transform: translate(-50%, -50%)',
-                'background: linear-gradient(135deg, rgba(239,68,68,0.95) 0%, rgba(185,28,28,0.95) 100%)',
+                'background: linear-gradient(135deg, rgba(217,119,6,0.96) 0%, rgba(146,64,14,0.96) 100%)',
                 'color: white', 'padding: 2rem 2.5rem', 'border-radius: 1.25rem',
-                'box-shadow: 0 25px 60px rgba(0,0,0,0.6)', 'z-index: 9999',
+                'box-shadow: 0 25px 60px rgba(0,0,0,0.45)', 'z-index: 9999',
                 'text-align: center', 'max-width: 380px', 'width: 90%',
-                'backdrop-filter: blur(12px)', 'border: 1px solid rgba(255,255,255,0.15)',
+                'backdrop-filter: blur(12px)', 'border: 1px solid rgba(255,255,255,0.22)',
                 'font-family: inherit', 'animation: fadeIn 0.3s ease'
             ].join(';');
             banner.innerHTML = `
-                <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">⛔</div>
-                <h2 style="font-size: 1.35rem; font-weight: 800; margin: 0 0 0.5rem;">Game Closed</h2>
+                <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🎉</div>
+                <h2 style="font-size: 1.35rem; font-weight: 800; margin: 0 0 0.5rem;">Word Quest Has Come to an End</h2>
                 <p style="font-size: 0.9rem; opacity: 0.9; margin: 0 0 1.25rem; line-height: 1.5;">
-                    The admin has ended this game session.<br>Please wait for the next round to begin.
+                    The competition has officially come to an end.<br>Thank you for playing — check the final leaderboard to see how you placed!
                 </p>
                 <button onclick="document.getElementById('game-closed-banner').remove()"
                     style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
@@ -438,6 +485,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Auto-dismiss after 6s
         setTimeout(() => { if (banner) banner.remove(); }, 6000);
+    }
+
+    // Hide/show the game entry (registration card + "Play Now" CTA) based on game state.
+    // The How-to-Play card and leaderboard stay visible while the game is closed.
+    function setGameEntryVisibility(show) {
+        const card = document.getElementById('player-card');
+        if (card) card.classList.toggle('hidden', !show);
+        document.querySelectorAll('.hero-cta').forEach((el) => el.classList.toggle('hidden', !show));
     }
 
     // ------------------------------------------------------------------
@@ -563,7 +618,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (alreadyAccepted) {
                 pendingRegData = regData;
-                proceedWithRegistration();
+                // Consent is stored on the device (roll|dept|year), so an admin-side
+                // player deletion leaves it behind. Verify the player still exists in
+                // Firestore; if they were deleted, drop the stale consent and re-prompt
+                // to read the Rules & Regulations again.
+                const fb = window.WordQuestFirebase;
+                if (fb && fb.getPlayerByRollNumber) {
+                    fb.getPlayerByRollNumber(roll, dept, year)
+                        .then((existing) => {
+                            if (existing) {
+                                proceedWithRegistration();
+                            } else {
+                                try { localStorage.removeItem(rulesKey); } catch (err2) {}
+                                if (startBtn) {
+                                    startBtn.disabled = true;
+                                    const t = startBtn.querySelector('.btn-text');
+                                    if (t) t.textContent = 'Review Rules...';
+                                }
+                                showRulesModal(regData);
+                            }
+                        })
+                        .catch(() => proceedWithRegistration());
+                } else {
+                    proceedWithRegistration();
+                }
             } else {
                 if (startBtn) {
                     startBtn.disabled = true;
@@ -768,6 +846,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Hide the game entry (registration card + "Play Now" CTA) in real time while the game is closed
+    function subscribeRulesVisibility() {
+        const applyState = (isActive) => setGameEntryVisibility(isActive !== false);
+        const trySubscribe = (fb) => {
+            if (fb && fb.subscribeToGameState) {
+                fb.subscribeToGameState(applyState);
+                return true;
+            }
+            return false;
+        };
+        if (!trySubscribe(window.WordQuestFirebase)) {
+            waitForFirebase((fb) => {
+                if (!trySubscribe(fb)) setRulesCardVisibility(true);
+            });
+        }
+    }
+
     // Ensure player is marked inactive while on index.html (not in game.html)
     function clearIndexActiveState(retries = 20) {
         if (window.WordQuestFirebase && window.WordQuestFirebase.unregisterActiveGame) {
@@ -803,6 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
     restoreSession();
     renderLeaderboardRows();
     subscribeLeaderboard();
+    subscribeRulesVisibility();
     maybeRevealLeaderboard();
     clearIndexActiveState();
 });

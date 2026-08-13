@@ -1009,6 +1009,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return ms ? new Date(ms) : null;
     }
 
+    function formatDateTime12hr(ts) {
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+        });
+    }
+
     function getSessionResultHtml(result) {
         switch (result) {
             case 'win':     return '<span class="history-result-pill result-win">Cleared</span>';
@@ -1054,10 +1063,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let lastPlayedText = '—';
         if (lastPlayedStamp) {
-            lastPlayedText = new Date(lastPlayedStamp).toLocaleString();
+            lastPlayedText = formatDateTime12hr(lastPlayedStamp) || new Date(lastPlayedStamp).toLocaleString();
         } else {
             const fallback = tsToMillis(player.lastActiveAt) || tsToMillis(player.gameStartedAt) || tsToMillis(player.registeredAt);
-            if (fallback) lastPlayedText = new Date(fallback).toLocaleString();
+            if (fallback) lastPlayedText = formatDateTime12hr(fallback) || new Date(fallback).toLocaleString();
         }
         if (historySummaryEls.last) historySummaryEls.last.textContent = lastPlayedText;
 

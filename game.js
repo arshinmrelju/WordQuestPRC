@@ -181,6 +181,17 @@ class SoundFX {
         } catch (e) {}
     }
 
+    /* Warm, celebratory "official ending" chime (admin close / event wrap-up). */
+    playEnding() {
+        try {
+            const chord = [261.63, 329.63, 392.0, 523.25];
+            chord.forEach((f, i) =>
+                this._tone(f, { type: 'sine', dur: 1.0, vol: 0.24, at: i * 0.07 }));
+            this._tone(659.25, { type: 'triangle', dur: 1.3, vol: 0.38, at: 0.28 });
+            this._tone(783.99, { type: 'triangle', dur: 1.5, vol: 0.3,  at: 0.4 });
+        } catch (e) {}
+    }
+
     playWin() {
         try {
             this._tone(523.25, { type: 'triangle', dur: 0.18, vol: 0.5 });
@@ -558,8 +569,103 @@ class WordSearch {
         document.getElementById('reopen-overlay-btn')?.classList.add('hidden');
         document.getElementById('admin-msg-overlay')?.classList.add('hidden');
 
-        SFX.playGameOver();
+        SFX.playEnding();
+        this._startEndedConfetti();
         overlay.classList.remove('hidden');
+    }
+
+    /* Soft canvas confetti that adds a "wrap-up celebration" feel. */
+    _startEndedConfetti() {
+        const canvas = document.getElementById('ended-confetti');
+        if (!canvas) return;
+        if (this._endedConfettiCleanup) this._endedConfettiCleanup();
+
+        const ctx = canvas.getContext('2d');
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        let W = 0, H = 0;
+        const resize = () => {
+            W = window.innerWidth;
+            H = window.innerHeight;
+            canvas.width = W * dpr;
+            canvas.height = H * dpr;
+            canvas.style.width = W + 'px';
+            canvas.style.height = H + 'px';
+        };
+        resize();
+        window.addEventListener('resize', resize);
+
+        const COLORS = ['#f7c948', '#d97706', '#f59e0b', '#ffffff', '#fbbf24', '#fb923c', '#fef3c7'];
+        const pieces = [];
+        const count = Math.min(150, Math.max(80, Math.round(W / 8)));
+
+        const spawn = () => {
+            pieces.push({
+                x: Math.random() * W,
+                y: -20 - Math.random() * 60,
+                w: 6 + Math.random() * 7,
+                h: 10 + Math.random() * 9,
+                color: COLORS[(Math.random() * COLORS.length) | 0],
+                vy: 2.4 + Math.random() * 2.6,
+                vx: (Math.random() - 0.5) * 1.4,
+                sway: Math.random() * Math.PI * 2,
+                swaySpeed: 0.02 + Math.random() * 0.05,
+                swayAmp: 0.6 + Math.random() * 1.4,
+                rot: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.22
+            });
+        };
+
+        for (let i = 0; i < count; i++) spawn();
+
+        const started = Date.now();
+        const DURATION = 12000;
+        let raf = null;
+
+        const tick = () => {
+            const elapsed = Date.now() - started;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.scale(dpr, dpr);
+
+            const alpha = elapsed > DURATION - 1500 ? Math.max(0, (DURATION - elapsed) / 1500) : 1;
+
+            for (let i = pieces.length - 1; i >= 0; i--) {
+                const p = pieces[i];
+                p.sway += p.swaySpeed;
+                p.x += p.vx + Math.sin(p.sway) * p.swayAmp * 0.5;
+                p.y += p.vy;
+                p.rot += p.rotSpeed;
+
+                if (p.y > H + 40) { pieces.splice(i, 1); continue; }
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                ctx.restore();
+            }
+
+            if (elapsed < DURATION && pieces.length < count * 0.8) spawn();
+
+            ctx.restore();
+
+            if (elapsed < DURATION) {
+                raf = requestAnimationFrame(tick);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                this._endedConfettiCleanup = null;
+            }
+        };
+        raf = requestAnimationFrame(tick);
+
+        this._endedConfettiCleanup = () => {
+            if (raf) cancelAnimationFrame(raf);
+            raf = null;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            window.removeEventListener('resize', resize);
+        };
     }
 
     goToMainMenu() {

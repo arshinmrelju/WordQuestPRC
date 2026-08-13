@@ -172,14 +172,26 @@
 
     <!-- Game Ended by Admin (shown to all live players in real time) -->
     <div class="overlay-backdrop hidden" id="ended-overlay" role="dialog" aria-modal="true">
+        <canvas id="ended-confetti" aria-hidden="true"></canvas>
+        <div class="party-floaters" aria-hidden="true">
+            <span class="party-emoji party-e1">🎉</span>
+            <span class="party-emoji party-e2">🏆</span>
+            <span class="party-emoji party-e3">🎊</span>
+            <span class="party-emoji party-e4">⭐</span>
+            <span class="party-emoji party-e5">🎈</span>
+            <span class="party-emoji party-e6">✨</span>
+        </div>
         <div class="glass-card overlay-dialog ended-dialog">
             <div class="ended-icon" aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    <path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/>
+                    <path d="M6 2h12v2a6 6 0 0 1-12 0z"/>
+                    <path d="M6 4a4 4 0 0 1-4 4h0a4 4 0 0 0 4 4"/>
+                    <path d="M18 4a4 4 0 0 0 4 4h0a4 4 0 0 1-4 4"/>
                 </svg>
             </div>
-            <h2 class="overlay-title">Game Ended</h2>
-            <p class="overlay-sub">The admin has ended this game session. The game is now closed for all players — thank you for playing Word Quest!</p>
+            <h2 class="overlay-title">Bravo, Word Hunters!</h2>
+            <p class="overlay-sub">Word Quest officially comes to an end today. Thank you for your incredible participation — your final results are on the leaderboard below!</p>
 
             <div class="score-showcase">
                 <span class="score-showcase-num gold-text" id="ended-round-score">0</span>
