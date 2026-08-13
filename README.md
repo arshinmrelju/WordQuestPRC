@@ -4,11 +4,11 @@
 
 **Pazhassiraja College, Pulpally · Department of English Carnival**
 
-<img src="assets/Pazhassiraja_College_Pulpally_Logo.png" height="90" alt="Pazhassiraja College Pulpally">
-&nbsp;&nbsp;&nbsp;
-<img src="assets/favicon.svg" width="90" alt="Word Quest Logo">
-&nbsp;&nbsp;&nbsp;
-<img src="assets/graphiccity-logo.svg" height="90" alt="GraphicCity">
+<img src="assets/Pazhassiraja_College_Pulpally_Logo.png" height="100" alt="Pazhassiraja College Pulpally">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="assets/favicon.svg" height="100" alt="Word Quest Logo">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="assets/graphiccity-logo.svg" height="120" alt="GraphicCity">
 
 <br>
 
@@ -126,13 +126,13 @@ and auto-ignores `firebase.json`, dotfiles, and `node_modules/`.
 
 <div align="center">
 
-<img src="assets/Pazhassiraja_College_Pulpally_Logo.png" height="42" alt="Pazhassiraja College Pulpally">
+<img src="assets/Pazhassiraja_College_Pulpally_Logo.png" height="44" alt="Pazhassiraja College Pulpally">
 
 **Pazhassiraja College, Pulpally** · Department of English
 
 <br>
 
-Powered by &nbsp;<a href="https://graphiccity.in" target="_blank"><img src="assets/graphiccity-logo.svg" height="20" alt="GraphicCity"> **GraphicCity**</a>
+Powered by &nbsp;<img src="assets/graphiccity-logo.svg" height="22" alt="GraphicCity"> **GraphicCity**
 
 </div>
 
