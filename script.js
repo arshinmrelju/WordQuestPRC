@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (roll && rollNumberInput)   rollNumberInput.value  = roll;
         if (dept && departmentSelect)  departmentSelect.value = dept;
         if (year && yearSelect)        yearSelect.value       = year;
+        toggleRollFieldVisibility();
     }
 
     // ------------------------------------------------------------------
@@ -119,7 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.already-reg-divider').classList.add('hidden');
         returningForm.classList.remove('hidden');
         if (formCardTitle) formCardTitle.textContent = 'Already Registered?';
-        if (formCardDesc)  formCardDesc.textContent  = 'Enter your roll number to resume your profile';
+        if (formCardDesc)  formCardDesc.textContent  = 'Enter your credentials to resume your profile';
+        toggleRollFieldVisibility();
     }
 
     function showNewForm() {
@@ -129,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.already-reg-divider').classList.remove('hidden');
         if (formCardTitle) formCardTitle.textContent = 'Player Profile';
         if (formCardDesc)  formCardDesc.textContent  = 'Enter your credentials to enter the competition';
+        toggleRollFieldVisibility();
     }
 
     if (alreadyRegToggle) alreadyRegToggle.addEventListener('click', showReturningForm);
@@ -580,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const name  = (playerNameInput  ? playerNameInput.value  : '').trim();
             const phone = (playerPhoneInput ? playerPhoneInput.value : '').trim();
-            const roll  = (rollNumberInput  ? rollNumberInput.value  : '').trim().toUpperCase();
+            let roll   = (rollNumberInput  ? rollNumberInput.value  : '').trim().toUpperCase();
             const dept  = departmentSelect ? departmentSelect.value : '';
             const year  = yearSelect       ? yearSelect.value       : '';
 
@@ -618,6 +621,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (alreadyAccepted) {
                 pendingRegData = regData;
+                if (startBtn) {
+                    startBtn.disabled = true;
+                    const t = startBtn.querySelector('.btn-text');
+                    if (t) t.textContent = 'Checking...';
+                }
                 // Consent is stored on the device (roll|dept|year), so an admin-side
                 // player deletion leaves it behind. Verify the player still exists in
                 // Firestore; if they were deleted, drop the stale consent and re-prompt
@@ -702,7 +710,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Firebase unavailable — proceed with whatever is in localStorage
                     saveToStorage(
                         localStorage.getItem(KEY_NAME) || 'Player',
-                        lookupRoll, dept, year
+                        lookupRoll, dept, year, phone
                     );
                     launchGame(retStartBtn);
                     return;
@@ -727,14 +735,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     // Found — restore profile and go
-                    saveToStorage(player.name || 'Player', lookupRoll, dept, year);
+                    saveToStorage(player.name || 'Player', lookupRoll, dept, year, player.phoneNumber || phone);
                     if (player.id) localStorage.setItem(KEY_PLAYER_ID, player.id);
                     launchGame(retStartBtn);
 
                 } catch (err) {
                     console.warn('Lookup error:', err);
                     // Network error fallback — still let them in
-                    saveToStorage(localStorage.getItem(KEY_NAME) || 'Player', lookupRoll, dept, year);
+                    saveToStorage(localStorage.getItem(KEY_NAME) || 'Player', lookupRoll, dept, year, phone);
                     launchGame(retStartBtn);
                 }
             });
@@ -757,10 +765,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (wbLevel) wbLevel.textContent = player.currentLevel || 1;
         if (wbScore) wbScore.textContent = player.cumulativeScore || 0;
 
-        // Reset the disabled button label while the modal is open
+        // Reset the disabled button labels while the modal is open
         if (startBtn) {
+            startBtn.disabled = false;
             const t = startBtn.querySelector('.btn-text');
             if (t) t.textContent = 'Begin Quest';
+        }
+        if (retStartBtn) {
+            retStartBtn.disabled = false;
+            const t = retStartBtn.querySelector('.btn-text');
+            if (t) t.textContent = 'Find & Begin Quest';
         }
 
         modal.classList.remove('hidden');
