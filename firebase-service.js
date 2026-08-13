@@ -22,19 +22,23 @@ import {
     serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAAD6Fxs22nbzFhm__70CPpRpcpQLEbT2Q",
-  authDomain: "wordquestprc.firebaseapp.com",
-  projectId: "wordquestprc",
-  storageBucket: "wordquestprc.firebasestorage.app",
-  messagingSenderId: "613220919561",
-  appId: "1:613220919561:web:c2a98ce61f1e9488a60bd8",
-  measurementId: "G-RW0WJNB5LY"
-};
+const globalConfig = (typeof window !== 'undefined' && window.WORD_QUEST_CONFIG)
+    ? window.WORD_QUEST_CONFIG
+    : {};
+const firebaseConfig = globalConfig.firebase || {};
 
-// Initialize Firebase App & Firestore
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_FIREBASE_API_KEY_HERE") {
+    console.error(
+        "[Word Quest] Firebase config is missing. " +
+        "Copy firebase-config.example.js to firebase-config.js " +
+        "and fill in your Firebase project credentials."
+    );
+}
+
+const app = firebaseConfig.apiKey && firebaseConfig.projectId
+    ? initializeApp(firebaseConfig)
+    : null;
+const db = app ? getFirestore(app) : null;
 
 /**
  * Save Score Record to Firestore Leaderboard using individual player tag doc ID (rollNumber|department|year)

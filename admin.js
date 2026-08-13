@@ -7,11 +7,19 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // ----------------------------------------------------------------------
-    // 0. Admin Access Code Authentication Gate
-    // ----------------------------------------------------------------------
-    const ADMIN_ACCESS_CODE = '673579';
+    const globalConfig = (typeof window !== 'undefined' && window.WORD_QUEST_CONFIG)
+        ? window.WORD_QUEST_CONFIG
+        : {};
+    const ADMIN_ACCESS_CODE = globalConfig.adminAccessCode || '';
     const STORAGE_KEY_ADMIN_AUTH = 'wordQuest_adminAuthed';
+
+    if (!ADMIN_ACCESS_CODE || ADMIN_ACCESS_CODE === 'YOUR_6_DIGIT_ADMIN_CODE') {
+        console.error(
+            "[Word Quest] Admin access code is not configured. " +
+            "Copy firebase-config.example.js to firebase-config.js " +
+            "and set adminAccessCode to a 6-digit PIN."
+        );
+    }
 
     const loginGate      = document.getElementById('admin-login-gate');
     const loginCodeInput = document.getElementById('admin-code-input');

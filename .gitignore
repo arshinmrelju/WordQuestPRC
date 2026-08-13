@@ -3,6 +3,13 @@
 firebase-debug.log*
 firestore-debug.log*
 
+# Local config (contains secrets - API keys, admin codes)
+firebase-config.js
+firebase-config.local.js
+.env
+.env.local
+.env.*.local
+
 # OS / Editor
 .DS_Store
 Thumbs.db
