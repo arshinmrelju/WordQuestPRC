@@ -456,7 +456,8 @@ class WordSearch {
                 remainingSeconds: this._remaining,
                 score: this.score,
                 level: this.level,
-                levelTitle: this.levelTitle
+                levelTitle: this.levelTitle,
+                bankedCumulative: this.cumulativeScore
             });
         }
     }
@@ -528,10 +529,11 @@ class WordSearch {
                     remainingSeconds: this._remaining,
                     score: this.score,
                     level: this.level,
-                    levelTitle: this.levelTitle
+                    levelTitle: this.levelTitle,
+                    bankedCumulative: this.cumulativeScore
                 });
             }
-        }, 15000);
+        }, 10000);
     }
 
     _stopLiveHeartbeat() {

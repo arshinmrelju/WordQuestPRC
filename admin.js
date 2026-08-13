@@ -390,9 +390,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // A player is "live" only if they reported in recently.
-    // Heartbeat syncs every 15s, so a stale player who closed their tab abruptly
+    // Heartbeat syncs every 10s, so a stale player who closed their tab abruptly
     // (no reliable unload write) drops off after LIVE_STALE_MS without a Firestore write.
-    const LIVE_STALE_MS = 60000;
+    const LIVE_STALE_MS = 25000;
 
     function tsToMillis(ts) {
         if (!ts) return null;

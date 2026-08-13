@@ -337,13 +337,13 @@ export async function updatePlayerLevelInFirestore(levelData = {}) {
 
 /**
  * Sync the player's active 2D grid matrix, target words, and found words to Firestore for live spectating
- * @param {Object} gridData { grid, words, placed, foundWords, gridSize, remainingSeconds, score, level, levelTitle }
+ * @param {Object} gridData { grid, words, placed, foundWords, gridSize, remainingSeconds, score, level, levelTitle, bankedCumulative }
  */
 export async function syncLiveGridToFirestore(gridData = {}) {
     const playerId = localStorage.getItem('wordQuest_playerFirestoreId');
     if (!playerId || !gridData) return null;
     try {
-        const { grid, words, placed, foundWords, gridSize, remainingSeconds, score, level, levelTitle } = gridData;
+        const { grid, words, placed, foundWords, gridSize, remainingSeconds, score, level, levelTitle, bankedCumulative } = gridData;
         // Firestore cannot store nested arrays (2D grids), so flatten each row into a string.
         const gridRows = Array.isArray(grid)
             ? grid.map(row => (Array.isArray(row) ? row.join('') : String(row ?? '')))
@@ -359,6 +359,7 @@ export async function syncLiveGridToFirestore(gridData = {}) {
                 score: score || 0,
                 level: level || 1,
                 levelTitle: levelTitle || 'Novice',
+                bankedCumulative: typeof bankedCumulative === 'number' ? bankedCumulative : null,
                 updatedAt: serverTimestamp()
             }
         });
@@ -414,7 +415,7 @@ export async function unregisterActiveGame() {
  * excludes index.html / idle sessions / players who closed their tab abruptly)
  * @param {Function} callback Called with the live count (number)
  */
-const LIVE_STALE_MS = 60000;
+const LIVE_STALE_MS = 25000;
 
 function firestoreTimestampToMillis(ts) {
     if (!ts) return null;
@@ -437,7 +438,7 @@ export function subscribeToActiveGameCount(callback) {
         const q = query(collection(db, "players"), where("active", "==", true));
         return onSnapshot(q, (snapshot) => {
             // Strictly count only players with an actual puzzle grid loaded (i.e. inside game.html)
-            // who have reported in recently (heartbeat is every 15s).
+            // who have reported in recently (heartbeat is every 10s).
             const liveInGame = snapshot.docs.filter(d => {
                 const data = d.data();
                 return data.liveState && Array.isArray(data.liveState.grid) && data.liveState.grid.length > 0 && isLiveDocFresh(data);
@@ -452,27 +453,97 @@ export function subscribeToActiveGameCount(callback) {
 }
 
 /**
- * Automatically flip stale live-player docs to inactive.
- * Players who closed game.html abruptly never fired the unload cleanup, so their
- * doc stays active:true forever. This clears them server-side after LIVE_STALE_MS
- * without a heartbeat, keeping the players collection tidy.
+ * Automatically flip stale live-player docs to inactive AND record the round as
+ * aborted. Players who closed game.html abruptly never fired the unload cleanup,
+ * so their doc stays active:true with a live grid forever. The LIVE views
+ * already drop them after LIVE_STALE_MS (freshness filter); this cleans the
+ * underlying docs server-side and writes a 'left' play session so the admin
+ * play-history reflects that the game truly ended.
+ * Uses a longer abort window than the live-view freshness check so players on
+ * background tabs (where browsers throttle the heartbeat timer) aren't wrongly
+ * aborted while they still return to play.
  * @returns {Promise<number>} Number of docs cleaned up
  */
 export async function cleanupStaleLivePlayers() {
     let cleaned = 0;
+    const ABORT_STALE_MS = 90000;
     try {
         const q = query(collection(db, "players"), where("active", "==", true), limit(500));
         const snap = await getDocs(q);
         const batch = [];
         snap.docs.forEach(d => {
             const data = d.data();
-            if (data.liveState && Array.isArray(data.liveState.grid) && data.liveState.grid.length > 0 && !isLiveDocFresh(data)) {
-                batch.push(updateDoc(doc(db, "players", d.id), { active: false, liveState: null }));
-                cleaned++;
+            if (!(data.liveState && Array.isArray(data.liveState.grid) && data.liveState.grid.length > 0)) return;
+            const stamp = firestoreTimestampToMillis(data.liveState.updatedAt) || firestoreTimestampToMillis(data.lastActiveAt);
+            if (stamp === null || (Date.now() - stamp) < ABORT_STALE_MS) return;
+
+            const live = data.liveState || {};
+            const wordsFound = Array.isArray(live.foundWords) ? live.foundWords.length : 0;
+            const totalWords = Array.isArray(live.words) ? live.words.length : 0;
+            let banked = Number(live.bankedCumulative);
+            const knowsBanked = Number.isFinite(banked) && banked >= 0;
+            if (!knowsBanked) banked = 0;
+
+            // The round was never completed, so the projected (unbanked) score the
+            // player left on the boards during live play must be cleared. If the
+            // liveState recorded the banked total (played on updated clients),
+            // revert the leaderboard & cumulativeScores to it — same semantics as
+            // _clearRoundScore for a failed round. Otherwise (legacy sessions) the
+            // projected value is the only thing on the boards, so delete them.
+            batch.push(updateDoc(doc(db, "players", d.id), {
+                active: false,
+                liveState: null,
+                score: 0,
+                cumulativeScore: knowsBanked ? banked : 0
+            }));
+            const leaderboardId = (data.rollNumber && data.department && data.year)
+                ? `${data.rollNumber}|${data.department}|${data.year}`
+                : (data.rollNumber || 'anonymous');
+            if (knowsBanked && leaderboardId) {
+                const leaderboardRef = doc(db, "leaderboard", leaderboardId);
+                batch.push(setDoc(leaderboardRef, {
+                    name:            data.name        || "Player",
+                    rollNumber:      data.rollNumber  || "",
+                    department:      data.department  || "",
+                    year:            data.year         || "",
+                    score:           0,
+                    cumulativeScore: banked,
+                    timestamp:       serverTimestamp(),
+                    date:            new Date().toLocaleDateString()
+                }, { merge: true }));
+                const cumulativeRef = doc(db, "cumulativeScores", leaderboardId);
+                batch.push(setDoc(cumulativeRef, {
+                    name:            data.name        || "Player",
+                    rollNumber:      data.rollNumber  || "",
+                    department:      data.department  || "",
+                    year:            data.year         || "",
+                    cumulativeScore: banked,
+                    updatedAt:       serverTimestamp()
+                }, { merge: true }));
+            } else if (leaderboardId) {
+                batch.push(deleteDoc(doc(db, "leaderboard", leaderboardId)).catch(() => {}));
+                batch.push(deleteDoc(doc(db, "cumulativeScores", leaderboardId)).catch(() => {}));
             }
+            batch.push(addDoc(collection(db, "playSessions"), {
+                name:            data.name        || "Player",
+                rollNumber:      data.rollNumber  || "",
+                department:      data.department  || "",
+                year:            data.year        || "",
+                level:           Number(data.currentLevel) || 1,
+                levelTitle:      data.levelTitle  || "Novice",
+                score:           0,
+                cumulativeScore: banked,
+                wordsFound,
+                totalWords,
+                timePlayedSecs:  0,
+                result:          'left',
+                endedAt:         serverTimestamp(),
+                date:            new Date().toLocaleDateString()
+            }));
+            cleaned++;
         });
         await Promise.allSettled(batch);
-        if (cleaned > 0) console.log("Cleaned stale live players:", cleaned);
+        if (cleaned > 0) console.log("Cleaned & aborted stale live players:", cleaned);
     } catch (e) {
         console.warn("cleanupStaleLivePlayers error:", e);
     }
