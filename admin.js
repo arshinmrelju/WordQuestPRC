@@ -66,6 +66,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Short department display: strip "Department of " and show at most 4 characters
+    function fmtDept(d) {
+        const s = (d || '').replace('Department of ', '') || '—';
+        return s.length > 4 ? s.slice(0, 4) : s;
+    }
+
     // ----------------------------------------------------------------------
     // 0.5. Present Mode (Live Players / Leaderboard) with code-locked close
     // ----------------------------------------------------------------------
@@ -120,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td><strong>${rankHtml}</strong></td>
                         <td><strong class="gold-text">${escapeHtml(item.rollNumber || '—')}</strong></td>
                         <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
-                        <td>${escapeHtml((item.department || '—').replace('Department of ', ''))}</td>
+                        <td>${escapeHtml(fmtDept(item.department))}</td>
                         <td><span class="diff-chip diff-medium">${escapeHtml(item.year || '—')}</span></td>
                         <td>${getLevelBadgeHtml(lvlNum, lvlTitle)}</td>
                         <td><span class="cum-score">${Math.max(item.cumulativeScore || 0, item.score || 0)}</span></td>
@@ -173,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td><span class="status-pill-live"><span class="live-pulse-dot"></span>LIVE</span></td>
                         <td><strong class="gold-text">${escapeHtml(item.rollNumber || '—')}</strong></td>
                         <td><strong>${escapeHtml(item.name || 'Anonymous')}</strong></td>
-                        <td>${escapeHtml((item.department || '—').replace('Department of ', ''))}</td>
+                        <td>${escapeHtml(fmtDept(item.department))}</td>
                         <td><span class="diff-chip diff-medium">${escapeHtml(item.year || '—')}</span></td>
                         <td>${getLevelBadgeHtml(lvlNum, lvlTitle)}</td>
                         <td><strong class="gold-text">${item.score || 0}</strong></td>
@@ -510,7 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 topDeptName = dept;
             }
         }
-        if (statTopDept) statTopDept.textContent = topDeptName;
+        if (statTopDept) statTopDept.textContent = fmtDept(topDeptName);
     }
 
     // ----------------------------------------------------------------------
@@ -550,7 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filtered.forEach((item, idx) => {
             const tr = document.createElement('tr');
-            const deptDisplay  = item.department ? item.department.replace('Department of ', '') : '—';
+            const deptDisplay  = fmtDept(item.department);
             const rollDisplay  = item.rollNumber || '—';
             const yearDisplay  = item.year || '—';
             const dateDisplay  = item.dateDisplay || '—';
@@ -654,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filtered.forEach((item) => {
             const tr = document.createElement('tr');
-            const deptDisplay  = item.department ? item.department.replace('Department of ', '') : '—';
+            const deptDisplay  = fmtDept(item.department);
             const rollDisplay  = item.rollNumber || '—';
             const yearDisplay  = item.year || '—';
             const phoneDisplay = item.phoneNumber || '—';
@@ -731,7 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
         activeSpectatePlayerId = player.id;
 
         if (spectateNameEl) spectateNameEl.textContent = player.name || 'Anonymous Player';
-        if (spectateSubEl)  spectateSubEl.textContent  = `Roll: ${player.rollNumber || '—'} • Dept: ${(player.department || '—').replace('Department of ', '')} • Year: ${player.year || '—'}`;
+        if (spectateSubEl)  spectateSubEl.textContent  = `Roll: ${player.rollNumber || '—'} • Dept: ${fmtDept(player.department)} • Year: ${player.year || '—'}`;
         
         if (modalLiveGrid) modalLiveGrid.classList.remove('hidden');
 
@@ -1043,7 +1049,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!player) return;
 
         if (historyNameEl) historyNameEl.textContent = player.name || 'Anonymous Player';
-        if (historySubEl)  historySubEl.textContent  = `Roll: ${player.rollNumber || '—'} • Dept: ${(player.department || '—').replace('Department of ', '')} • Year: ${player.year || '—'}`;
+        if (historySubEl)  historySubEl.textContent  = `Roll: ${player.rollNumber || '—'} • Dept: ${fmtDept(player.department)} • Year: ${player.year || '—'}`;
 
         const key = playerSessionKey(player);
         const sessions = playSessionsList
@@ -1195,7 +1201,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (idx === 2) rankBadge = medalSvg('bronze', '3');
 
             const rollDisplay = item.rollNumber || '—';
-            const deptDisplay = item.department ? item.department.replace('Department of ', '') : '—';
+            const deptDisplay = fmtDept(item.department);
             const yearDisplay = item.year || '—';
             const dateDisplay = item.date || new Date().toLocaleDateString();
             const cumScore = item.cumulativeScore || item.score || 0;

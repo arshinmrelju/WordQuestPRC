@@ -814,7 +814,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (index === 0) rank = medalSvg('gold', '1');
                 else if (index === 1) rank = medalSvg('silver', '2');
                 else if (index === 2) rank = medalSvg('bronze', '3');
-                const dept = item.department ? String(item.department).replace('Department of ', '') : '';
+                const deptRaw = item.department ? String(item.department).replace('Department of ', '') : '';
+                const dept = deptRaw.length > 4 ? deptRaw.slice(0, 4) : deptRaw;
                 tr.innerHTML = `
                     <td><strong>${rank}</strong></td>
                     <td>${item.name}</td>

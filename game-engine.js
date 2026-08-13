@@ -1030,7 +1030,8 @@ class WordQuestEngine {
                 const tr = document.createElement('tr');
                 const rankBadge = (index === 0) ? this._buildMedalSvg('gold', '1') : (index === 1) ? this._buildMedalSvg('silver', '2') : (index === 2) ? this._buildMedalSvg('bronze', '3') : `${index + 1}`;
 
-                const deptText = item.department ? item.department.replace('Department of ', '') : item.difficulty;
+                const deptRaw = item.department ? item.department.replace('Department of ', '') : item.difficulty;
+                const deptText = deptRaw.length > 4 ? deptRaw.slice(0, 4) : deptRaw;
 
                 tr.innerHTML = `
                     <td><strong>${rankBadge}</strong></td>

@@ -748,7 +748,8 @@ class WordSearch {
         container.innerHTML = top.map((item, index) => {
             const rank = index + 1;
             const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : String(rank);
-            const dept = (item.department || '').replace('Department of ', '') || '—';
+            const deptRaw = (item.department || '').replace('Department of ', '') || '—';
+            const dept = deptRaw.length > 4 ? deptRaw.slice(0, 4) : deptRaw;
             const isMe = myRoll && String(item.rollNumber) === String(myRoll);
             return `
                 <div class="lb-row ${isMe ? 'lb-row-me' : ''}">
@@ -1619,11 +1620,8 @@ class WordSearch {
         const name = localStorage.getItem('wordQuest_playerName') || 'Player';
         const dept = localStorage.getItem('wordQuest_department') || '—';
         nameEl.textContent = name.length > 5 ? name.slice(0, 5).trimEnd() + '.' : name;
-        if (dept.startsWith('Department of ')) {
-            deptEl.textContent = dept.replace('Department of ', '');
-        } else {
-            deptEl.textContent = dept;
-        }
+        let shortDept = dept.startsWith('Department of ') ? dept.replace('Department of ', '') : dept;
+        deptEl.textContent = shortDept.length > 4 ? shortDept.slice(0, 4) : shortDept;
     }
 
     /* ── SCORE PERSISTENCE ────────────────────── */
