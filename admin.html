@@ -170,6 +170,11 @@
                             <span>Leaderboard</span>
                             <span class="tab-badge" id="badge-leaderboard-count">0</span>
                         </button>
+                        <button type="button" class="admin-tab-btn" id="tab-btn-usage" data-tab="usage">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                            <span>Usage</span>
+                            <span class="tab-badge badge-usage" id="badge-usage-count">0</span>
+                        </button>
                     </div>
                     <button type="button" id="btn-preview-leaderboard" class="glass-btn btn-secondary btn-sm hidden" title="Present leaderboard in full-screen mode" aria-label="Present leaderboard">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
@@ -178,7 +183,7 @@
                 </div>
 
                 <!-- Filters & Controls Bar -->
-                <div class="admin-filters-bar">
+                <div class="admin-filters-bar" id="admin-filters-bar">
                     <!-- Search Input -->
                     <div class="search-input-wrapper">
                         <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -285,6 +290,209 @@
                             <!-- Populated dynamically via admin.js -->
                         </tbody>
                     </table>
+                </div>
+
+                <!-- 4. Game Usage & Traffic Analytics Report View -->
+                <div class="usage-view-panel hidden" id="view-usage-panel">
+                    <!-- Top Summary KPI Grid -->
+                    <div class="usage-kpi-grid">
+                        <!-- 1. Peak Player Count & Time -->
+                        <div class="usage-kpi-card highlight-card">
+                            <div class="usage-kpi-header">
+                                <div class="usage-icon-wrapper icon-peak">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+                                </div>
+                                <div>
+                                    <span class="usage-kpi-label">Peak Player Count</span>
+                                    <span class="usage-kpi-sub">Highest Simultaneous Traffic</span>
+                                </div>
+                            </div>
+                            <div class="usage-kpi-body">
+                                <h3 class="usage-kpi-value gold-text" id="report-peak-count">0</h3>
+                                <span class="usage-kpi-unit">Players</span>
+                            </div>
+                            <div class="usage-kpi-footer">
+                                <span class="peak-time-pill" id="report-peak-time"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Peak Time: —</span>
+                            </div>
+                        </div>
+
+                        <!-- 2. Total Sessions Played -->
+                        <div class="usage-kpi-card">
+                            <div class="usage-kpi-header">
+                                <div class="usage-icon-wrapper icon-games">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                </div>
+                                <div>
+                                    <span class="usage-kpi-label">Total Games Played</span>
+                                    <span class="usage-kpi-sub">Rounds Completed &amp; Attempted</span>
+                                </div>
+                            </div>
+                            <div class="usage-kpi-body">
+                                <h3 class="usage-kpi-value" id="report-total-games">0</h3>
+                                <span class="usage-kpi-unit">Rounds</span>
+                            </div>
+                            <div class="usage-kpi-footer">
+                                <span id="report-active-players-count">0 unique players participated</span>
+                            </div>
+                        </div>
+
+                        <!-- 3. Total Playtime Spent -->
+                        <div class="usage-kpi-card">
+                            <div class="usage-kpi-header">
+                                <div class="usage-icon-wrapper icon-time">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                </div>
+                                <div>
+                                    <span class="usage-kpi-label">Total Playtime Spent</span>
+                                    <span class="usage-kpi-sub">Cumulative Player Playtime</span>
+                                </div>
+                            </div>
+                            <div class="usage-kpi-body">
+                                <h3 class="usage-kpi-value" id="report-total-time">0m</h3>
+                                <span class="usage-kpi-unit" id="report-avg-time">Avg: 0s / game</span>
+                            </div>
+                            <div class="usage-kpi-footer">
+                                <span id="report-avg-duration-sub">Avg game duration: 0s</span>
+                            </div>
+                        </div>
+
+                        <!-- 4. Game Clear Rate -->
+                        <div class="usage-kpi-card">
+                            <div class="usage-kpi-header">
+                                <div class="usage-icon-wrapper icon-rate">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                </div>
+                                <div>
+                                    <span class="usage-kpi-label">Game Clear Rate</span>
+                                    <span class="usage-kpi-sub">Puzzles Solved</span>
+                                </div>
+                            </div>
+                            <div class="usage-kpi-body">
+                                <h3 class="usage-kpi-value" id="report-clear-rate">0%</h3>
+                                <span class="usage-kpi-unit" id="report-cleared-count">0 cleared</span>
+                            </div>
+                            <div class="usage-kpi-footer">
+                                <span id="report-fail-count">0 timeouts • 0 left</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analytics Charts & Department Breakdown Grid -->
+                    <div class="usage-analytics-grid">
+                        <!-- Hourly Activity Bar Timeline -->
+                        <div class="analytics-card hourly-activity-card">
+                            <div class="analytics-card-header">
+                                <div>
+                                    <h4 class="analytics-card-title">Hourly Activity &amp; Player Traffic Timeline</h4>
+                                    <p class="analytics-card-sub">Distribution of game sessions across hours (Peak hour highlighted)</p>
+                                </div>
+                                <span class="peak-badge-highlight" id="report-peak-hour-badge">Peak: —</span>
+                            </div>
+                            <div class="hourly-chart-container" id="hourly-chart-container">
+                                <!-- Hourly bars rendered dynamically via admin.js -->
+                            </div>
+                        </div>
+
+                        <!-- Department Activity Breakdown -->
+                        <div class="analytics-card dept-breakdown-card">
+                            <div class="analytics-card-header">
+                                <div>
+                                    <h4 class="analytics-card-title">Department Traffic &amp; Participation</h4>
+                                    <p class="analytics-card-sub">Most active departments by sessions and playtime</p>
+                                </div>
+                                <span class="top-dept-badge" id="report-top-dept-badge">Top: —</span>
+                            </div>
+                            <div class="dept-bars-list" id="dept-bars-container">
+                                <!-- Department bars rendered dynamically via admin.js -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Level Funnel & Game Outcomes Grid -->
+                    <div class="usage-funnel-grid">
+                        <!-- Level Progression Distribution -->
+                        <div class="analytics-card">
+                            <div class="analytics-card-header">
+                                <h4 class="analytics-card-title">Level Progression Reached</h4>
+                                <p class="analytics-card-sub">How far players reached in levels</p>
+                            </div>
+                            <div class="level-funnel-container" id="level-funnel-container">
+                                <!-- Rendered dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Outcome Breakdown -->
+                        <div class="analytics-card">
+                            <div class="analytics-card-header">
+                                <h4 class="analytics-card-title">Game Outcomes Breakdown</h4>
+                                <p class="analytics-card-sub">Cleared vs Timed Out vs Left</p>
+                            </div>
+                            <div class="outcome-bars-container" id="outcome-bars-container">
+                                <!-- Rendered dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Usage History / Sessions Filter & Action Bar -->
+                    <div class="admin-filters-bar usage-filters-bar">
+                        <div class="search-input-wrapper">
+                            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="usage-search-input" class="glass-input search-input" placeholder="Search name, roll number, or dept...">
+                        </div>
+                        <div class="filter-wrapper">
+                            <select id="usage-dept-filter" class="glass-input glass-select filter-select">
+                                <option value="ALL">All Departments</option>
+                                <option value="Department of Biochemistry">Biochemistry</option>
+                                <option value="Department of Commerce">Commerce</option>
+                                <option value="Department of Economics">Economics</option>
+                                <option value="Department of English">English</option>
+                                <option value="Department of History">History</option>
+                                <option value="Department of Journalism and Mass Communication">Journalism</option>
+                                <option value="Department of Microbiology">Microbiology</option>
+                                <option value="Department of Travel and Tourism">Travel &amp; Tourism</option>
+                            </select>
+                        </div>
+                        <div class="filter-wrapper">
+                            <select id="usage-result-filter" class="glass-input glass-select filter-select">
+                                <option value="ALL">All Outcomes</option>
+                                <option value="win">Cleared Only</option>
+                                <option value="timeout">Timed Out Only</option>
+                                <option value="left">Left Mid-Game</option>
+                            </select>
+                        </div>
+                        <div class="filter-wrapper">
+                            <select id="usage-level-filter" class="glass-input glass-select filter-select">
+                                <option value="ALL">All Levels</option>
+                                <option value="1">Lvl 1 (Novice)</option>
+                                <option value="2">Lvl 2 (Apprentice)</option>
+                                <option value="3">Lvl 3 (Scholar)</option>
+                                <option value="4">Lvl 4 (Master)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Complete Game Usage / Session History Table -->
+                    <div class="table-wrapper usage-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Date &amp; Time</th>
+                                    <th>Roll No</th>
+                                    <th>Player Name</th>
+                                    <th>Department</th>
+                                    <th>Year</th>
+                                    <th>Level</th>
+                                    <th>Result</th>
+                                    <th>Words</th>
+                                    <th>Score</th>
+                                    <th>Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-usage-table-body">
+                                <!-- Populated dynamically via admin.js -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 

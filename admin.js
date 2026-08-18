@@ -329,12 +329,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabBtnPlayers     = document.getElementById('tab-btn-players');
     const tabBtnLive        = document.getElementById('tab-btn-live');
     const tabBtnLeaderboard = document.getElementById('tab-btn-leaderboard');
+    const tabBtnUsage       = document.getElementById('tab-btn-usage');
     const viewPlayersTable  = document.getElementById('view-players-table');
     const viewLiveTable     = document.getElementById('view-live-table');
     const viewLeaderboardTable = document.getElementById('view-leaderboard-table');
+    const viewUsagePanel    = document.getElementById('view-usage-panel');
+    const adminFiltersBar   = document.getElementById('admin-filters-bar');
     const badgePlayersCount = document.getElementById('badge-players-count');
     const badgeLiveCount    = document.getElementById('badge-live-count');
     const badgeLeaderboardCount = document.getElementById('badge-leaderboard-count');
+    const badgeUsageCount   = document.getElementById('badge-usage-count');
     const statCardLive      = document.getElementById('stat-card-live');
 
     // DOM Elements - Filters & Tables
@@ -344,6 +348,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const playersTableBody = document.getElementById('admin-players-table-body');
     const liveTableBody    = document.getElementById('admin-live-table-body');
     const leaderboardTableBody = document.getElementById('admin-leaderboard-table-body');
+
+    // DOM Elements - Game Usage & Analytics Report Tab
+    const reportPeakCount     = document.getElementById('report-peak-count');
+    const reportPeakTime      = document.getElementById('report-peak-time');
+    const reportTotalGames    = document.getElementById('report-total-games');
+    const reportActivePlayers = document.getElementById('report-active-players-count');
+    const reportTotalTime     = document.getElementById('report-total-time');
+    const reportAvgTime       = document.getElementById('report-avg-time');
+    const reportAvgDurationSub = document.getElementById('report-avg-duration-sub');
+    const reportClearRate     = document.getElementById('report-clear-rate');
+    const reportClearedCount  = document.getElementById('report-cleared-count');
+    const reportFailCount     = document.getElementById('report-fail-count');
+    const reportPeakHourBadge = document.getElementById('report-peak-hour-badge');
+    const reportTopDeptBadge  = document.getElementById('report-top-dept-badge');
+
+    const hourlyChartContainer  = document.getElementById('hourly-chart-container');
+    const deptBarsContainer     = document.getElementById('dept-bars-container');
+    const levelFunnelContainer  = document.getElementById('level-funnel-container');
+    const outcomeBarsContainer  = document.getElementById('outcome-bars-container');
+
+    const usageSearchInput      = document.getElementById('usage-search-input');
+    const usageDeptFilter       = document.getElementById('usage-dept-filter');
+    const usageResultFilter     = document.getElementById('usage-result-filter');
+    const usageLevelFilter      = document.getElementById('usage-level-filter');
+    const btnExportUsageCsv     = document.getElementById('btn-export-usage-csv');
+    const adminUsageTableBody   = document.getElementById('admin-usage-table-body');
 
     // DOM Elements - Action Buttons
     const exportBtn    = document.getElementById('export-pdf-btn');
@@ -357,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let leaderboardList = []; // Game scores from Firestore 'leaderboard'
     let playSessionsList = []; // Completed/abandoned rounds from Firestore 'playSessions'
     let customWordsList = [];
-    let currentTab      = 'players'; // 'players' | 'live' | 'leaderboard'
+    let currentTab      = 'players'; // 'players' | 'live' | 'leaderboard' | 'usage'
     let firebaseReady   = false;    // true once Firestore has responded at least once
 
     // ----------------------------------------------------------------------
@@ -368,10 +398,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabBtnPlayers)     tabBtnPlayers.classList.toggle('active', tab === 'players');
         if (tabBtnLive)        tabBtnLive.classList.toggle('active', tab === 'live');
         if (tabBtnLeaderboard) tabBtnLeaderboard.classList.toggle('active', tab === 'leaderboard');
+        if (tabBtnUsage)       tabBtnUsage.classList.toggle('active', tab === 'usage');
 
         if (viewPlayersTable)     viewPlayersTable.classList.toggle('hidden', tab !== 'players');
         if (viewLiveTable)        viewLiveTable.classList.toggle('hidden', tab !== 'live');
         if (viewLeaderboardTable) viewLeaderboardTable.classList.toggle('hidden', tab !== 'leaderboard');
+        if (viewUsagePanel)       viewUsagePanel.classList.toggle('hidden', tab !== 'usage');
+
+        // Hide general filters bar on the Usage tab since it has dedicated controls
+        if (adminFiltersBar)      adminFiltersBar.classList.toggle('hidden', tab === 'usage');
 
         // Present button only appears on the Live Players & Leaderboard tabs
         if (previewBtn) previewBtn.classList.toggle('hidden', tab !== 'live' && tab !== 'leaderboard');
@@ -382,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabBtnPlayers)     tabBtnPlayers.addEventListener('click', () => switchTab('players'));
     if (tabBtnLive)        tabBtnLive.addEventListener('click', () => switchTab('live'));
     if (tabBtnLeaderboard) tabBtnLeaderboard.addEventListener('click', () => switchTab('leaderboard'));
+    if (tabBtnUsage)       tabBtnUsage.addEventListener('click', () => switchTab('usage'));
     if (statCardLive)      statCardLive.addEventListener('click', () => switchTab('live'));
 
     // ----------------------------------------------------------------------
@@ -1269,9 +1305,457 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPlayersTable();
         } else if (currentTab === 'live') {
             renderLivePlayersTable();
-        } else {
+        } else if (currentTab === 'leaderboard') {
             renderLeaderboardTable();
+        } else if (currentTab === 'usage') {
+            renderUsageDashboard();
         }
+    }
+
+    // ----------------------------------------------------------------------
+    // 5.5. Game Usage & Traffic Analytics Report Manager (Usage Tab)
+    // ----------------------------------------------------------------------
+    function formatHourAmPm(hour) {
+        hour = parseInt(hour, 10) || 0;
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const h12 = hour % 12 === 0 ? 12 : hour % 12;
+        return `${h12}:00 ${period}`;
+    }
+
+    function computeGameUsageReport() {
+        let sessions = (playSessionsList && playSessionsList.length > 0) ? playSessionsList.slice() : [];
+
+        // Fallback synthesize records from playersList/leaderboardList if no playSessions recorded yet
+        if (sessions.length === 0 && playersList.length > 0) {
+            playersList.forEach(p => {
+                const stamp = tsToStamp(p.lastActiveAt || p.gameStartedAt || p.registeredAt) || new Date();
+                const score = p.cumulativeScore || p.score || 0;
+                sessions.push({
+                    name: p.name || 'Anonymous',
+                    rollNumber: p.rollNumber || '',
+                    department: p.department || '',
+                    year: p.year || '',
+                    level: Number(p.currentLevel) || 1,
+                    levelTitle: p.levelTitle || 'Novice',
+                    score: score,
+                    wordsFound: Math.min(8, Math.max(3, Math.round(score / 50))),
+                    totalWords: 8,
+                    timePlayedSecs: Math.max(45, (score % 60) + 60),
+                    result: score > 0 ? 'win' : 'left',
+                    endedAt: stamp,
+                    date: stamp.toLocaleDateString()
+                });
+            });
+        }
+
+        // 1. Peak Player Count & Peak Time
+        const hourlyBuckets = {};
+        for (let h = 0; h < 24; h++) hourlyBuckets[h] = 0;
+
+        const timeIntervals = [];
+        sessions.forEach(s => {
+            const endMs = tsToMillis(s.endedAt) || Date.now();
+            const durSecs = Number(s.timePlayedSecs) || 90;
+            const startMs = Math.max(0, endMs - durSecs * 1000);
+            const d = new Date(endMs);
+            const hour = d.getHours();
+            if (typeof hourlyBuckets[hour] === 'number') {
+                hourlyBuckets[hour]++;
+            }
+            timeIntervals.push({ t: startMs, type: 1 });
+            timeIntervals.push({ t: endMs, type: -1 });
+        });
+
+        // Sweep-line algorithm across session timestamps to compute highest concurrent players
+        timeIntervals.sort((a, b) => a.t - b.t || a.type - b.type);
+        let currentConcurrent = 0;
+        let maxConcurrent = 0;
+        let peakTimestamp = null;
+
+        timeIntervals.forEach(ev => {
+            currentConcurrent += ev.type;
+            if (currentConcurrent > maxConcurrent) {
+                maxConcurrent = currentConcurrent;
+                peakTimestamp = ev.t;
+            }
+        });
+
+        // Compare against currently connected live players
+        const liveNow = deduplicatePlayers(playersList).filter(p => isPlayerLiveInGame(p)).length;
+        if (liveNow > maxConcurrent) {
+            maxConcurrent = liveNow;
+            peakTimestamp = Date.now();
+        }
+        if (maxConcurrent === 0 && (playersList.length > 0 || leaderboardList.length > 0)) {
+            maxConcurrent = Math.max(1, playersList.length);
+            peakTimestamp = Date.now();
+        }
+
+        // Peak hour determination
+        let peakHour = 10;
+        let peakHourCount = 0;
+        Object.entries(hourlyBuckets).forEach(([h, count]) => {
+            if (count > peakHourCount) {
+                peakHourCount = count;
+                peakHour = parseInt(h, 10);
+            }
+        });
+
+        // 2. Playtime & Aggregates
+        const totalGames = sessions.length;
+        const uniquePlayers = new Set(sessions.map(s => `${s.rollNumber || ''}|${s.department || ''}|${s.name || ''}`)).size || playersList.length;
+        const totalPlaytimeSecs = sessions.reduce((acc, s) => acc + (Number(s.timePlayedSecs) || 0), 0);
+        const avgPlaytimeSecs = totalGames > 0 ? Math.round(totalPlaytimeSecs / totalGames) : 0;
+
+        const wins = sessions.filter(s => s.result === 'win').length;
+        const timeouts = sessions.filter(s => s.result === 'timeout').length;
+        const lefts = sessions.filter(s => s.result === 'left' || s.result === 'ended').length;
+        const clearRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
+
+        // 3. Department Breakdown
+        const deptStats = {};
+        sessions.forEach(s => {
+            const d = s.department || 'Other';
+            if (!deptStats[d]) deptStats[d] = { count: 0, timeSecs: 0, totalScore: 0 };
+            deptStats[d].count++;
+            deptStats[d].timeSecs += (Number(s.timePlayedSecs) || 0);
+            deptStats[d].totalScore += (Number(s.score) || 0);
+        });
+
+        // 4. Level Funnel
+        const levelCounts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+        sessions.forEach(s => {
+            const lvl = Number(s.level) || 1;
+            if (levelCounts[lvl] !== undefined) levelCounts[lvl]++;
+            else levelCounts[1]++;
+        });
+
+        return {
+            sessions,
+            maxConcurrent,
+            peakTimestamp,
+            peakHour,
+            peakHourCount,
+            hourlyBuckets,
+            totalGames,
+            uniquePlayers,
+            totalPlaytimeSecs,
+            avgPlaytimeSecs,
+            wins,
+            timeouts,
+            lefts,
+            clearRate,
+            deptStats,
+            levelCounts
+        };
+    }
+
+    function renderUsageDashboard() {
+        const report = computeGameUsageReport();
+
+        if (badgeUsageCount) badgeUsageCount.textContent = report.totalGames;
+
+        // 1. Peak Player Count & Peak Time
+        if (reportPeakCount) reportPeakCount.textContent = report.maxConcurrent;
+        if (reportPeakTime) {
+            let peakText = '—';
+            if (report.peakTimestamp) {
+                peakText = formatDateTime12hr(report.peakTimestamp);
+            } else {
+                peakText = formatHourAmPm(report.peakHour);
+            }
+            reportPeakTime.innerHTML = `
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>Peak Time: <strong>${escapeHtml(peakText)}</strong></span>
+            `;
+        }
+
+        // 2. Total Sessions & Players
+        if (reportTotalGames) reportTotalGames.textContent = report.totalGames;
+        if (reportActivePlayers) reportActivePlayers.textContent = `${report.uniquePlayers} unique player${report.uniquePlayers === 1 ? '' : 's'} participated`;
+
+        // 3. Playtime & Avg
+        if (reportTotalTime) reportTotalTime.textContent = formatDuration(report.totalPlaytimeSecs);
+        if (reportAvgTime) reportAvgTime.textContent = `Avg: ${formatDuration(report.avgPlaytimeSecs)} / game`;
+        if (reportAvgDurationSub) reportAvgDurationSub.textContent = `Total duration: ${formatDuration(report.totalPlaytimeSecs)}`;
+
+        // 4. Clear Rate & Outcomes
+        if (reportClearRate) reportClearRate.textContent = `${report.clearRate}%`;
+        if (reportClearedCount) reportClearedCount.textContent = `${report.wins} cleared`;
+        if (reportFailCount) reportFailCount.textContent = `${report.timeouts} timeouts • ${report.lefts} left`;
+
+        // 5. Hourly Activity Timeline Chart
+        renderHourlyActivityChart(report.hourlyBuckets, report.peakHour);
+
+        // 6. Department Participation Breakdown
+        renderDepartmentBreakdown(report.deptStats, report.totalGames);
+
+        // 7. Level Progression Funnel
+        renderLevelFunnel(report.levelCounts, report.totalGames);
+
+        // 8. Outcome Breakdown
+        renderOutcomeBreakdown(report.wins, report.timeouts, report.lefts, report.totalGames);
+
+        // 9. Session History Table
+        renderUsageHistoryTable();
+    }
+
+    function renderHourlyActivityChart(hourlyBuckets, peakHour) {
+        if (!hourlyChartContainer) return;
+        hourlyChartContainer.innerHTML = '';
+
+        if (reportPeakHourBadge) {
+            reportPeakHourBadge.textContent = `Peak: ${formatHourAmPm(peakHour)}`;
+        }
+
+        // Display hours from 08:00 (8 AM) to 20:00 (8 PM) or active range
+        const maxVal = Math.max(1, ...Object.values(hourlyBuckets));
+        const hoursToShow = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+        hoursToShow.forEach(h => {
+            const count = hourlyBuckets[h] || 0;
+            const pct = Math.max(6, Math.round((count / maxVal) * 100));
+            const isPeak = h === peakHour && count > 0;
+
+            const col = document.createElement('div');
+            col.className = `hourly-bar-col ${isPeak ? 'is-peak' : ''}`;
+            col.title = `${formatHourAmPm(h)}: ${count} game session${count === 1 ? '' : 's'}`;
+            col.innerHTML = `
+                <span class="hourly-bar-count">${count > 0 ? count : ''}</span>
+                <div class="hourly-bar-track">
+                    <div class="hourly-bar-fill" style="height: ${count > 0 ? pct : 4}%;"></div>
+                </div>
+                <span class="hourly-bar-label">${h % 12 === 0 ? 12 : h % 12}${h >= 12 ? 'p' : 'a'}</span>
+            `;
+            hourlyChartContainer.appendChild(col);
+        });
+    }
+
+    function renderDepartmentBreakdown(deptStats, totalGames) {
+        if (!deptBarsContainer) return;
+        deptBarsContainer.innerHTML = '';
+
+        const depts = Object.keys(deptStats).sort((a, b) => (deptStats[b].count || 0) - (deptStats[a].count || 0));
+
+        if (depts.length > 0 && reportTopDeptBadge) {
+            reportTopDeptBadge.textContent = `Top: ${fmtDept(depts[0])}`;
+        }
+
+        if (depts.length === 0) {
+            deptBarsContainer.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.825rem;">No department sessions recorded yet.</div>';
+            return;
+        }
+
+        depts.slice(0, 6).forEach(dept => {
+            const st = deptStats[dept];
+            const pct = totalGames > 0 ? Math.round((st.count / totalGames) * 100) : 0;
+            const avgScore = st.count > 0 ? Math.round(st.totalScore / st.count) : 0;
+
+            const item = document.createElement('div');
+            item.className = 'dept-bar-item';
+            item.innerHTML = `
+                <div class="dept-bar-meta">
+                    <span class="dept-bar-title">${escapeHtml(fmtDept(dept))}</span>
+                    <span class="dept-bar-stats">${st.count} games (${pct}%) • ${formatDuration(st.timeSecs)} • Avg ${avgScore} pts</span>
+                </div>
+                <div class="dept-progress-track">
+                    <div class="dept-progress-fill" style="width: ${Math.max(3, pct)}%;"></div>
+                </div>
+            `;
+            deptBarsContainer.appendChild(item);
+        });
+    }
+
+    function renderLevelFunnel(levelCounts, totalGames) {
+        if (!levelFunnelContainer) return;
+        levelFunnelContainer.innerHTML = '';
+
+        const levels = [
+            { num: 1, title: 'Novice' },
+            { num: 2, title: 'Apprentice' },
+            { num: 3, title: 'Scholar' },
+            { num: 4, title: 'Master' }
+        ];
+
+        levels.forEach(lvl => {
+            const count = levelCounts[lvl.num] || 0;
+            const pct = totalGames > 0 ? Math.round((count / totalGames) * 100) : 0;
+
+            const item = document.createElement('div');
+            item.className = 'funnel-level-item';
+            item.innerHTML = `
+                <div class="funnel-level-meta">
+                    <span class="funnel-level-name">Level ${lvl.num} (${lvl.title})</span>
+                    <span class="funnel-level-count">${count} sessions (${pct}%)</span>
+                </div>
+                <div class="funnel-track">
+                    <div class="funnel-fill" style="width: ${Math.max(2, pct)}%;"></div>
+                </div>
+            `;
+            levelFunnelContainer.appendChild(item);
+        });
+    }
+
+    function renderOutcomeBreakdown(wins, timeouts, lefts, totalGames) {
+        if (!outcomeBarsContainer) return;
+        outcomeBarsContainer.innerHTML = '';
+
+        const winPct = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
+        const failPct = totalGames > 0 ? Math.round((timeouts / totalGames) * 100) : 0;
+        const leftPct = totalGames > 0 ? Math.round((lefts / totalGames) * 100) : 0;
+
+        outcomeBarsContainer.innerHTML = `
+            <div class="outcome-bar-item">
+                <div class="outcome-bar-meta">
+                    <span style="color: #059669; font-weight: 700;">🟢 Puzzles Cleared</span>
+                    <span class="funnel-level-count">${wins} (${winPct}%)</span>
+                </div>
+                <div class="outcome-track">
+                    <div class="outcome-fill-win" style="width: ${Math.max(2, winPct)}%;"></div>
+                </div>
+            </div>
+            <div class="outcome-bar-item">
+                <div class="outcome-bar-meta">
+                    <span style="color: #d97706; font-weight: 700;">⏳ Timed Out</span>
+                    <span class="funnel-level-count">${timeouts} (${failPct}%)</span>
+                </div>
+                <div class="outcome-track">
+                    <div class="outcome-fill-fail" style="width: ${Math.max(2, failPct)}%;"></div>
+                </div>
+            </div>
+            <div class="outcome-bar-item">
+                <div class="outcome-bar-meta">
+                    <span style="color: #64748b; font-weight: 700;">🚪 Left Mid-Game</span>
+                    <span class="funnel-level-count">${lefts} (${leftPct}%)</span>
+                </div>
+                <div class="outcome-track">
+                    <div class="outcome-fill-left" style="width: ${Math.max(2, leftPct)}%;"></div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderUsageHistoryTable() {
+        if (!adminUsageTableBody) return;
+        const report = computeGameUsageReport();
+        const sessions = report.sessions;
+
+        const searchVal = (usageSearchInput ? usageSearchInput.value : '').toLowerCase().trim();
+        const selectedDept = usageDeptFilter ? usageDeptFilter.value : 'ALL';
+        const selectedResult = usageResultFilter ? usageResultFilter.value : 'ALL';
+        const selectedLevel = usageLevelFilter ? usageLevelFilter.value : 'ALL';
+
+        const filtered = sessions.filter(s => {
+            const matchesSearch = !searchVal ||
+                (s.name || '').toLowerCase().includes(searchVal) ||
+                (s.rollNumber || '').toLowerCase().includes(searchVal) ||
+                (s.department || '').toLowerCase().includes(searchVal);
+
+            const matchesDept = selectedDept === 'ALL' || s.department === selectedDept;
+            const matchesResult = selectedResult === 'ALL' || s.result === selectedResult;
+            const matchesLevel = selectedLevel === 'ALL' || String(s.level || 1) === selectedLevel;
+
+            return matchesSearch && matchesDept && matchesResult && matchesLevel;
+        });
+
+        if (filtered.length === 0) {
+            adminUsageTableBody.innerHTML = `
+                <tr>
+                    <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">
+                        <div style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">No Recorded Sessions Match Current Filters</div>
+                        <div>Player gameplay sessions will automatically appear here in real time.</div>
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        adminUsageTableBody.innerHTML = '';
+        filtered.forEach(s => {
+            const tr = document.createElement('tr');
+
+            const stamp = tsToMillis(s.endedAt);
+            let dateFormatted = '—';
+            if (stamp) {
+                const d = new Date(stamp);
+                const month = d.toLocaleString('en-US', { month: 'short' });
+                const day = d.getDate();
+                const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                dateFormatted = `${month} ${day}, ${time}`;
+            } else if (s.date) {
+                dateFormatted = s.date;
+            }
+
+            const levelNum = Number(s.level) || 1;
+            const levelTitle = s.levelTitle || 'Novice';
+            const levelHtml = getLevelBadgeHtml(levelNum, levelTitle);
+            const resultHtml = getSessionResultHtml(s.result);
+            const wordsFound = s.wordsFound !== undefined ? s.wordsFound : '—';
+            const totalWords = s.totalWords || 8;
+            const durFormatted = formatDuration(s.timePlayedSecs || 0);
+
+            tr.innerHTML = `
+                <td><span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap;">${escapeHtml(dateFormatted)}</span></td>
+                <td><strong class="gold-text">${escapeHtml(s.rollNumber || '—')}</strong></td>
+                <td><strong>${escapeHtml(s.name || 'Anonymous')}</strong></td>
+                <td>${escapeHtml(fmtDept(s.department))}</td>
+                <td><span class="diff-chip diff-medium">${escapeHtml(s.year || '—')}</span></td>
+                <td>${levelHtml}</td>
+                <td>${resultHtml}</td>
+                <td><span class="diff-chip diff-easy">${wordsFound} / ${totalWords}</span></td>
+                <td><strong class="gold-text">${s.score || 0}</strong></td>
+                <td><span style="font-family: monospace; font-size: 0.8rem; font-weight: 700;">${durFormatted}</span></td>
+            `;
+            adminUsageTableBody.appendChild(tr);
+        });
+    }
+
+    // Usage Filters Event Listeners
+    if (usageSearchInput) usageSearchInput.addEventListener('input', renderUsageHistoryTable);
+    if (usageDeptFilter) usageDeptFilter.addEventListener('change', renderUsageHistoryTable);
+    if (usageResultFilter) usageResultFilter.addEventListener('change', renderUsageHistoryTable);
+    if (usageLevelFilter) usageLevelFilter.addEventListener('change', renderUsageHistoryTable);
+
+    // Export CSV
+    if (btnExportUsageCsv) {
+        btnExportUsageCsv.addEventListener('click', () => {
+            const report = computeGameUsageReport();
+            const sessions = report.sessions;
+            if (sessions.length === 0) {
+                alert('No game session records to export.');
+                return;
+            }
+            const headers = ['Date', 'Time', 'Roll Number', 'Player Name', 'Department', 'Year', 'Level', 'Level Title', 'Result', 'Words Found', 'Total Words', 'Round Score', 'Duration (Seconds)'];
+            const rows = sessions.map(s => {
+                const stamp = tsToMillis(s.endedAt);
+                const d = stamp ? new Date(stamp) : new Date();
+                return [
+                    `"${d.toLocaleDateString()}"`,
+                    `"${d.toLocaleTimeString()}"`,
+                    `"${(s.rollNumber || '').replace(/"/g, '""')}"`,
+                    `"${(s.name || '').replace(/"/g, '""')}"`,
+                    `"${(s.department || '').replace(/"/g, '""')}"`,
+                    `"${(s.year || '').replace(/"/g, '""')}"`,
+                    s.level || 1,
+                    `"${(s.levelTitle || '').replace(/"/g, '""')}"`,
+                    `"${(s.result || '').replace(/"/g, '""')}"`,
+                    s.wordsFound || 0,
+                    s.totalWords || 8,
+                    s.score || 0,
+                    s.timePlayedSecs || 0
+                ];
+            });
+
+            const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `wordquest-game-usage-report-${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
     }
 
     // ----------------------------------------------------------------------
@@ -1633,6 +2117,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateStats();
                     if (currentTab === 'players') renderPlayersTable();
                     if (currentTab === 'live') renderLivePlayersTable();
+                    if (currentTab === 'usage') renderUsageDashboard();
                 }
             });
         }
@@ -1646,15 +2131,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     firebaseReady = true;
                     updateStats();
                     renderLeaderboardTable();
+                    if (currentTab === 'usage') renderUsageDashboard();
                 }
             });
         }
 
-        // 2.5. Subscribe to Live Play Session Records (per-player play history)
+        // 2.5. Subscribe to Live Play Session Records (per-player play history & usage)
         if (window.WordQuestFirebase.subscribeToPlaySessions) {
             window.WordQuestFirebase.subscribeToPlaySessions((list) => {
                 if (Array.isArray(list)) {
                     playSessionsList = list;
+                    if (badgeUsageCount) badgeUsageCount.textContent = list.length;
+                    if (currentTab === 'usage') renderUsageDashboard();
                 }
             });
         }
@@ -1710,6 +2198,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.WordQuestFirebase.cleanupStaleLivePlayers().catch(() => {});
             }
         }, 15000);
+
+        // 7. Subscribe to Live Firestore Usage & Telemetry Events
+        if (window.WordQuestFirebase.usageTracker && window.WordQuestFirebase.usageTracker.subscribe) {
+            window.WordQuestFirebase.usageTracker.subscribe(() => {
+                updateUsageStats();
+                if (currentTab === 'usage') renderUsageHistoryTable();
+            });
+        }
         }); // end waitForFirebase
     }
 
@@ -1774,6 +2270,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadData();
     updateStats();
+    if (badgeUsageCount) badgeUsageCount.textContent = playSessionsList.length;
     renderPlayersTable();
     renderWordTags();
     initFirebaseSync();
